@@ -13,14 +13,18 @@
 
 ros::NodeHandle nh;
 
-bool resetOffsets = false;
+// global flags to control program behavior
+static const bool resetOffsets = false;
+static const bool flag_input_from_ros = true;
+
+bool flag_input_updated;
 
 // arm lengths
-float a1 = 15.00;     // proximal motor upper arm [mm]
-float a2 = 20.00;     // proximal motor lower arm
-float a3 = 20.00;     // distal motor lower arm
-float a4 = 15.00;     // distal motor upper arm
-float a5 = 20.00;     // spacing between motors
+static const float a1 = 15.00;     // proximal motor upper arm [mm]
+static const float a2 = 20.00;     // proximal motor lower arm
+static const float a3 = 20.00;     // distal motor lower arm
+static const float a4 = 15.00;     // distal motor upper arm
+static const float a5 = 20.00;     // spacing between motors
 
 Servo servo_base_right;
 Servo servo_base_left;
@@ -31,13 +35,11 @@ int servo_base_right_pos;
 int servo_base_left_pos;
 
 // center positions
-//float x0 = -10.00;  // [mm]
-//float y0 = 28.00;   // [mm]
 int servo_base_right_0; // = 35;
 int servo_base_left_0; // = 32;
 
 // workspace guides
-float r_max = 10;
+static const float r_max = 10;
 float x_center;
 float y_center;
 float xI;
@@ -45,45 +47,98 @@ float yI;
 
 bool badCoords;
 
+// a publisher
+std_msgs::String pub_msg;
+ros::Publisher test_pub("test_topic", &pub_msg);
 
+char test_str[] = "this is test";
+
+//----------------------------- callback functions ------------------------------
+String cmd_dir;
 void ctrl_callback(const std_msgs::String& msg) {
-    
+    cmd_dir = msg.data;
+    flag_input_updated = true;
 }
 
-// MAIN SETUP ///////////////////////////////////////////////////////////////////
+ros::Subscriber<std_msgs::String> sub("haptic_control", &ctrl_callback);
+
+
+//----------------------------- get input ------------------------------
+char get_input() {
+    char dir_val;
+    
+    // input is either from keyboard or ros
+    if (flag_input_from_ros) {
+        while (!flag_input_updated) {
+            pub_msg.data = test_str;
+            test_pub.publish(&pub_msg);
+            nh.spinOnce();
+            delay(10);
+        }
+        
+        dir_val = cmd_dir[0];
+        flag_input_updated = false;
+    }
+    else {
+        // check for user input
+        while (Serial.available() == 0) { }
+    
+        // use only most recent variable
+        while (Serial.available() > 0) {
+            dir_val = Serial.read();
+        }
+    }
+    
+    return dir_val;
+}
+
+//----------------------------- main setup ------------------------------
 void setup() {
-    //Serial communication
-    Serial.begin(38400);
+    if (flag_input_from_ros) {
+        nh.initNode();
+        nh.subscribe(sub);
+        nh.advertise(test_pub);
+    }
+    else {
+        // use serial monitor
+        Serial.begin(38400);
+    }
     
     // connect servos
     servo_base_right.attach(9);
     servo_base_left.attach(10);
     
-    if (resetOffsets) {
-    servo_base_right_0 = servoOffset(servo_base_right) - 90;
-    servo_base_left_0 = servoOffset(servo_base_left) - 90;
+    // servo reset can only be adjusted through Serial Monitor
+    if (!flag_input_from_ros && resetOffsets) {
+        servo_base_right_0 = servoOffset(servo_base_right) - 90;
+        servo_base_left_0 = servoOffset(servo_base_left) - 90;
     }
     else {
-    servo_base_right_0 = 33; //15;
-    servo_base_left_0 = 29;
+        servo_base_right_0 = 33; //15;
+        servo_base_left_0 = 29;
     }
-    Serial.print("servo_base_right Offset: ");
-    Serial.print(servo_base_right_0);
-    Serial.print("   servo_base_left Offset: ");
-    Serial.println(servo_base_left_0);
+    
+    if (!flag_input_from_ros) {
+        Serial.print("servo_base_right Offset: ");
+        Serial.print(servo_base_right_0);
+        Serial.print("   servo_base_left Offset: ");
+        Serial.println(servo_base_left_0);
+    }
     
     x_center = -a5 / 2;
     y_center = 3.0 * sqrt((a1 + a2) * (a1 + a2) - (0.5 * a5) * (0.5 * a5)) / 4.0;
     
-    Serial.print("x_center: ");
-    Serial.print(x_center);
-    Serial.print("   y_center: ");
-    Serial.println(y_center);
+    if (!flag_input_from_ros) {
+        Serial.print("x_center: ");
+        Serial.print(x_center);
+        Serial.print("   y_center: ");
+        Serial.println(y_center);
+    }
     
     xI = x_center;
     yI = y_center;
     
-    inverseKinematics(xI, yI);
+    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
     servo_base_right_pos = newTheta_left;
     servo_base_left_pos = newTheta_right;
     
@@ -97,79 +152,74 @@ void setup() {
     //  Serial.print("Index prox: ");
     //  Serial.println(servo_base_left.read());
     
-    Serial.println("Choose a direction:");
-    Serial.println("     I: Forward");
-    Serial.println("     M: Back");
-    Serial.println("     J: Clockwise");
-    Serial.println("     L: Counterclockwise");
-    Serial.println("     K: Reset to center");
+    
+    if (!flag_input_from_ros) {
+        Serial.println("Choose a direction:");
+        Serial.println("     I: Forward");
+        Serial.println("     ,: Back");
+        Serial.println("     J: Left");
+        Serial.println("     L: Right");
+        Serial.println("     K: Reset to center");
+    }
 
+    flag_input_updated = false;
 }
 
-
-// MAIN LOOP /////////////////////////////////////////////////////////////////
+//----------------------------- main loop ------------------------------
 void loop() {
     int delta = 15;
     char directionVal;
     int push = 4;
+    int push_diag = 3;
     
-    // check for user input
-    while (Serial.available() == 0) { }
-    
-    // use only most recent variable
-    while (Serial.available() > 0) {
-        directionVal = Serial.read();
-    }
+    directionVal = get_input();
     
     switch (directionVal) {                     //  apply new command
     
-    case 'I':                 // Up
+    case 'I':                 // Forward
     case 'i':
     case '1':
-      yI = yI - push;  // [mm]
-      break;
+        xI = xI - push;
+        break;
     
-    case 'M':                 // Down
-    case 'm':
-    case '2':
-      yI = yI + push;
-      break;
+    case ',':                 // Backward
+        xI = xI + push;
+        break;
     
-    case 'L':                 // Back
+    case 'L':                 // Left
     case 'l':
     case '3':
-      xI = xI + push;
-      break;
+        yI = yI + push;
+        break;
     
-    case 'J':               // Forward
+    case 'J':               // Right
     case 'j':
     case '4':
-      xI = xI - push;
-      break;
+        yI = yI - push;
+        break;
     
-    case 'H':               // Twist Left
-    case 'h':
-    case '5':
-      xI = xI + push;
-      break;
-    
-    case ';':               // Twist Right
-    case '6':
-      xI = xI - push;
-      break;
-    
-    case 'U':               // Tilt Left
     case 'u':
-    case '7':
-      yI = yI - push;
-      break;
-    
-    case 'O':             // Tilt Right
+    case 'U':
+        xI = xI - push_diag;
+        yI = yI - push_diag;
+        break;
+        
     case 'o':
-    case '8':
-      yI = yI + push;
-      break;
-    
+    case 'O':
+        xI = xI - push_diag;
+        yI = yI + push_diag;
+        break;
+        
+    case 'm':
+    case 'M':
+        xI = xI + push_diag;
+        yI = yI - push_diag;
+        break;
+        
+    case '.':
+        xI = xI + push_diag;
+        yI = yI + push_diag;
+        break;
     
     case 'K':               // Center
     case 'k':
@@ -177,31 +227,7 @@ void loop() {
       yI = y_center;
       xI = x_center;
       break;
-    
-    case 'Y':
-    case 'y':
-    case '0':
-      float r = 1.5;
-      for (float t = PI / 4; t < PI / 2; t += PI / 64) {
-        xI = x_center + r * cos(t);
-        yI = (y_center - r) + r * sin(t);
-        
-        if ( (xI - x_center) * (xI - x_center) + (yI - y_center) * (yI - y_center) > r_max) {
-          badCoords = true;
-        }
-    
-        inverseKinematics(xI, yI);
-        servo_base_right_pos = newTheta_left;
-        servo_base_left_pos = newTheta_right;
-        if ( !badCoords) {
-          coordinatedMovement(servo_base_right, servo_base_left, delta, 
-                servo_base_right_pos + servo_base_right_0, 
-                servo_base_left_pos + servo_base_left_0);
-        }
-        delay(2);
-      }
-    
-    
+      
     }
     
     // calculate new motor commands
@@ -209,7 +235,7 @@ void loop() {
         badCoords = true;
     }
     
-    inverseKinematics(xI, yI);
+    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
     servo_base_right_pos = newTheta_left;
     servo_base_left_pos = newTheta_right;
     
@@ -218,15 +244,26 @@ void loop() {
         coordinatedMovement(servo_base_right, servo_base_left, delta, 
             servo_base_right_pos + servo_base_right_0, 
             servo_base_left_pos + servo_base_left_0);
-
-    //    Serial.print("Index dist: ");
-    //    Serial.println(servo_base_right.read());
-    //    Serial.print("Index prox: ");
-    //    Serial.println(servo_base_left.read());
-    //    delay(20);
     }
     else {
-        Serial.println("Bad Coordinates");
+        if (!flag_input_from_ros) {
+            Serial.println("Bad Coordinates");
+        }
     }
+    
+    // pause for 0.2s
+    delay(200);
+    
+    // return to center
+    yI = y_center;
+    xI = x_center;
+    
+    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
+    servo_base_right_pos = newTheta_left;
+    servo_base_left_pos = newTheta_right;
+    
+    coordinatedMovement(servo_base_right, servo_base_left, delta, 
+            servo_base_right_pos + servo_base_right_0, 
+            servo_base_left_pos + servo_base_left_0);
 }
 

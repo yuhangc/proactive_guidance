@@ -1,10 +1,12 @@
 
 // INVERSE KINEMATICS ///////////////////////////////////////////////////////////////////
-void inverseKinematics(float x, float y) {
-  Serial.print("x: ");
-  Serial.print(x);
-  Serial.print("    y: ");
-  Serial.println(y);
+void inverseKinematics(float x, float y, float& new_th_left, float& new_th_right) {
+    if (!flag_input_from_ros) {
+        Serial.print("x: ");
+        Serial.print(x);
+        Serial.print("    y: ");
+        Serial.println(y);
+    }
 
   // Distances to x,y from each motor hub
   float  D1 = sqrt(x * x + y * y);
@@ -24,8 +26,8 @@ void inverseKinematics(float x, float y) {
   float alpha5 = atan2(y, x + a5);
 
   // solved motor angles
-  newTheta_left = (PI - alpha1 - beta1) * 180 / PI;
-  newTheta_right = (alpha5 +  beta5) * 180 / PI;
+  new_th_left = (PI - alpha1 - beta1) * 180 / PI;
+  new_th_right = (alpha5 +  beta5) * 180 / PI;
 
 }
 

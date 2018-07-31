@@ -1,8 +1,9 @@
 
 // STARTUP OFFSET ADJUSTMENT ///////////////////////////////////////////////////////////////////
 int servoOffset(Servo s) {
-
-  Serial.println("Press H,J,L,; to move servo arm to straight down. Press A when done");
+    if (!flag_input_from_ros) {
+        Serial.println("Press H,J,L,; to move servo arm to straight down. Press A when done");
+    }
 
   bool setPointFound = false;
   char userInput = 'v';
