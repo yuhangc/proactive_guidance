@@ -18,6 +18,7 @@ static const bool resetOffsets = false;
 static const bool flag_input_from_ros = true;
 
 bool flag_input_updated;
+bool flag_action;
 
 // arm lengths
 static const float a1 = 15.00;     // proximal motor upper arm [mm]
@@ -46,6 +47,15 @@ float xI;
 float yI;
 
 bool badCoords;
+
+// push maginitude and pause
+float mag = 0.4;
+float pause = 0.2;
+
+const float dmag = 1.0;
+const float dpause = 0.2;
+const float mag_range[2] = {2.0, 8.0};
+const float pause_range[2] = {0.0, 1.0};
 
 // a publisher
 std_msgs::String pub_msg;
@@ -89,7 +99,22 @@ char get_input() {
         }
     }
     
+    if (dir_val == 'w' || dir_val == 's' || dir_val == 'a' || dir_val == 'd') {
+        flag_action = false;
+    }
+    else {
+        flag_action = true;
+    }
+    
     return dir_val;
+}
+
+//----------------------------- helper functions ------------------------------
+void clip(float& x, const float x_min, const float x_max) {
+    if (x < x_min)
+        x = x_min;
+    else if (x > x_max)
+        x = x_max;
 }
 
 //----------------------------- main setup ------------------------------
@@ -165,70 +190,9 @@ void setup() {
     flag_input_updated = false;
 }
 
-//----------------------------- main loop ------------------------------
-void loop() {
+//----------------------------- main control ------------------------------
+void execute_control() {
     int delta = 15;
-    char directionVal;
-    int push = 4;
-    int push_diag = 3;
-    
-    directionVal = get_input();
-    
-    switch (directionVal) {                     //  apply new command
-    
-    case 'I':                 // Forward
-    case 'i':
-    case '1':
-        xI = xI - push;
-        break;
-    
-    case ',':                 // Backward
-        xI = xI + push;
-        break;
-    
-    case 'L':                 // Left
-    case 'l':
-    case '3':
-        yI = yI + push;
-        break;
-    
-    case 'J':               // Right
-    case 'j':
-    case '4':
-        yI = yI - push;
-        break;
-    
-    case 'u':
-    case 'U':
-        xI = xI - push_diag;
-        yI = yI - push_diag;
-        break;
-        
-    case 'o':
-    case 'O':
-        xI = xI - push_diag;
-        yI = yI + push_diag;
-        break;
-        
-    case 'm':
-    case 'M':
-        xI = xI + push_diag;
-        yI = yI - push_diag;
-        break;
-        
-    case '.':
-        xI = xI + push_diag;
-        yI = yI + push_diag;
-        break;
-    
-    case 'K':               // Center
-    case 'k':
-    case '9':
-      yI = y_center;
-      xI = x_center;
-      break;
-      
-    }
     
     // calculate new motor commands
     if ( (xI - x_center) * (xI - x_center) + (yI - y_center) * (yI - y_center) > r_max) {
@@ -252,7 +216,7 @@ void loop() {
     }
     
     // pause for 0.2s
-    delay(200);
+    delay(pause*1000);
     
     // return to center
     yI = y_center;
@@ -265,5 +229,93 @@ void loop() {
     coordinatedMovement(servo_base_right, servo_base_left, delta, 
             servo_base_right_pos + servo_base_right_0, 
             servo_base_left_pos + servo_base_left_0);
+}
+
+//----------------------------- main loop ------------------------------
+void loop() {
+    char directionVal;
+    float mag_diag = mag * 0.8;
+    
+    directionVal = get_input();
+    
+    switch (directionVal) {                     //  apply new command
+    
+    case 'I':                 // Forward
+    case 'i':
+    case '1':
+        xI = xI - mag;
+        break;
+    
+    case ',':                 // Backward
+        xI = xI + mag;
+        break;
+    
+    case 'L':                 // Left
+    case 'l':
+    case '3':
+        yI = yI + mag;
+        break;
+    
+    case 'J':               // Right
+    case 'j':
+    case '4':
+        yI = yI - mag;
+        break;
+    
+    case 'u':
+    case 'U':
+        xI = xI - mag_diag;
+        yI = yI - mag_diag;
+        break;
+        
+    case 'o':
+    case 'O':
+        xI = xI - mag_diag;
+        yI = yI + mag_diag;
+        break;
+        
+    case 'm':
+    case 'M':
+        xI = xI + mag_diag;
+        yI = yI - mag_diag;
+        break;
+        
+    case '.':
+        xI = xI + mag_diag;
+        yI = yI + mag_diag;
+        break;
+    
+    case 'K':               // Center
+    case 'k':
+    case '9':
+      yI = y_center;
+      xI = x_center;
+      break;
+      
+    case 'w':
+        mag += dmag;
+        break;
+    
+    case 's':
+        mag -= dmag;
+        break;
+        
+    case 'a':
+        pause -= dpause;
+        break;
+        
+    case 'd':
+        pause += dpause;
+        break;
+      
+    }
+    
+    // clip mag and pause
+    clip(mag, mag_range[0], mag_range[1]);
+    clip(pause, pause_range[0], pause_range[1]);
+    
+    if (flag_action) {
+        execute_control();
+    }
 }
 
