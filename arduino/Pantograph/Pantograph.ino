@@ -30,6 +30,8 @@ static const float a5 = 20.00;     // spacing between motors
 Servo servo_base_right;
 Servo servo_base_left;
 
+static const int power_ctrl_pin = 35;
+
 float newTheta_left;
 float newTheta_right;
 int servo_base_right_pos;
@@ -117,8 +119,19 @@ void clip(float& x, const float x_min, const float x_max) {
         x = x_max;
 }
 
+void dist(float x1, float y1, float x2, float y2) {
+    float x_diff = x1 - x2;
+    float y_diff = y1 - y2;
+    
+    return sqrt(x_diff * x_diff + y_diff * y_diff);
+}
+
 //----------------------------- main setup ------------------------------
 void setup() {
+    pinMode(power_ctrl_pin, OUTPUT);
+    // set power to off first
+    digitalWrite(power_ctrl_pin, LOW);
+    
     if (flag_input_from_ros) {
         nh.initNode();
         nh.subscribe(sub);
@@ -170,6 +183,9 @@ void setup() {
     // start at center position
     servo_base_right.write(servo_base_right_pos + servo_base_right_0);
     servo_base_left.write(servo_base_left_pos + servo_base_left_0);
+    
+    // enable servo power after writing the position
+    digitalWrite(power_ctrl_pin, HIGH);
     
     //  Serial.println("Starting values: ");
     //  Serial.print("Index dist: ");
@@ -235,6 +251,7 @@ void execute_control() {
 void loop() {
     char directionVal;
     float mag_diag = mag * 0.8;
+    float rot_corr = -1.0;
     
     directionVal = get_input();
     
@@ -243,46 +260,46 @@ void loop() {
     case 'I':                 // Forward
     case 'i':
     case '1':
-        xI = xI - mag;
+        xI = xI - mag * rot_corr;
         break;
     
     case ',':                 // Backward
-        xI = xI + mag;
+        xI = xI + mag * rot_corr;
         break;
     
     case 'L':                 // Left
     case 'l':
     case '3':
-        yI = yI + mag;
+        yI = yI + mag * rot_corr;
         break;
     
     case 'J':               // Right
     case 'j':
     case '4':
-        yI = yI - mag;
+        yI = yI - mag * rot_corr;
         break;
     
     case 'u':
     case 'U':
-        xI = xI - mag_diag;
-        yI = yI - mag_diag;
+        xI = xI - mag_diag * rot_corr;
+        yI = yI - mag_diag * rot_corr;
         break;
         
     case 'o':
     case 'O':
-        xI = xI - mag_diag;
-        yI = yI + mag_diag;
+        xI = xI - mag_diag * rot_corr;
+        yI = yI + mag_diag * rot_corr;
         break;
         
     case 'm':
     case 'M':
-        xI = xI + mag_diag;
-        yI = yI - mag_diag;
+        xI = xI + mag_diag * rot_corr;
+        yI = yI - mag_diag * rot_corr;
         break;
         
     case '.':
-        xI = xI + mag_diag;
-        yI = yI + mag_diag;
+        xI = xI + mag_diag * rot_corr;
+        yI = yI + mag_diag * rot_corr;
         break;
     
     case 'K':               // Center
