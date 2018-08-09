@@ -20,26 +20,24 @@ static const bool flag_input_from_ros = true;
 bool flag_input_updated;
 bool flag_action;
 
-// arm lengths
+// device configurations
 static const float a1 = 15.00;     // proximal motor upper arm [mm]
 static const float a2 = 20.00;     // proximal motor lower arm
 static const float a3 = 20.00;     // distal motor lower arm
 static const float a4 = 15.00;     // distal motor upper arm
 static const float a5 = 20.00;     // spacing between motors
 
-Servo servo_base_right;
-Servo servo_base_left;
-
 static const int power_ctrl_pin = 35;
 
-float newTheta_left;
-float newTheta_right;
-int servo_base_right_pos;
-int servo_base_left_pos;
+static const float servo_offset_left = 29;
+static const float servo_offset_left = 33;
 
-// center positions
-int servo_base_right_0; // = 35;
-int servo_base_left_0; // = 32;
+static const int servo_pin_left = 10;
+static const int servo_pin_right = 9;
+
+static const float goal_tol = 1;    // mm
+static const float rate_loop = 50;
+static const float rate_moving = 50;
 
 // workspace guides
 static const float r_max = 10;
@@ -59,6 +57,9 @@ const float dpause = 0.2;
 const float mag_range[2] = {2.0, 8.0};
 const float pause_range[2] = {0.0, 1.0};
 
+// a pantograph device pointer
+PantographDevice* device;
+
 // a publisher
 std_msgs::String pub_msg;
 ros::Publisher test_pub("test_topic", &pub_msg);
@@ -76,7 +77,8 @@ ros::Subscriber<std_msgs::String> sub("haptic_control", &ctrl_callback);
 
 
 //----------------------------- get input ------------------------------
-char get_input() {
+// block version
+char get_input_block() {
     char dir_val;
     
     // input is either from keyboard or ros
@@ -111,6 +113,36 @@ char get_input() {
     return dir_val;
 }
 
+// none block version
+char get_input() {
+    char dir_val;
+    
+    if (flag_input_from_ros) {
+        if (!flag_input_updated)
+            return 'n';
+
+        dir_val = cmd_dir[0];
+        flag_input_updated = false;
+    }
+    else {
+        if (!Serial.available())
+            return 'n';
+
+        while (Serial.available()) {
+            dir_val = Serial.read();
+        }
+    }
+
+    if (dir_val == 'w' || dir_val == 's' || dir_val == 'a' || dir_val == 'd') {
+        flag_action = false;
+    }
+    else {
+        flag_action = true;
+    }
+    
+    return dir_val;
+}
+
 //----------------------------- helper functions ------------------------------
 void clip(float& x, const float x_min, const float x_max) {
     if (x < x_min)
@@ -128,10 +160,6 @@ void dist(float x1, float y1, float x2, float y2) {
 
 //----------------------------- main setup ------------------------------
 void setup() {
-    pinMode(power_ctrl_pin, OUTPUT);
-    // set power to off first
-    digitalWrite(power_ctrl_pin, LOW);
-    
     if (flag_input_from_ros) {
         nh.initNode();
         nh.subscribe(sub);
@@ -142,57 +170,36 @@ void setup() {
         Serial.begin(38400);
     }
     
-    // connect servos
-    servo_base_right.attach(9);
-    servo_base_left.attach(10);
-    
+    // create a pantograph device
+    device = new PantographDevice(a1, a2, a3, a4, a5, servo_pin_left, servo_pin_right,
+                                  servo_offset_left, servo_offset_right, power_ctrl_pin);
+
+    // set tolerance and loop rate
+    device->SetGoalReachingTool(goal_tol);
+    device->SetLoopRate(rate_loop, rate_moving);
+
+
     // servo reset can only be adjusted through Serial Monitor
-    if (!flag_input_from_ros && resetOffsets) {
-        servo_base_right_0 = servoOffset(servo_base_right) - 90;
-        servo_base_left_0 = servoOffset(servo_base_left) - 90;
-    }
-    else {
-        servo_base_right_0 = 33; //15;
-        servo_base_left_0 = 29;
-    }
+//    if (!flag_input_from_ros && resetOffsets) {
+//        servo_base_right_0 = servoOffset(servo_base_right) - 90;
+//        servo_base_left_0 = servoOffset(servo_base_left) - 90;
+//    }
     
     if (!flag_input_from_ros) {
         Serial.print("servo_base_right Offset: ");
-        Serial.print(servo_base_right_0);
+        Serial.print(servo_offset_right);
         Serial.print("   servo_base_left Offset: ");
-        Serial.println(servo_base_left_0);
+        Serial.println(servo_offset_left);
     }
     
-    x_center = -a5 / 2;
-    y_center = 3.0 * sqrt((a1 + a2) * (a1 + a2) - (0.5 * a5) * (0.5 * a5)) / 4.0;
+    device->GetPos(xI, yI);
     
     if (!flag_input_from_ros) {
         Serial.print("x_center: ");
-        Serial.print(x_center);
+        Serial.print(xI);
         Serial.print("   y_center: ");
-        Serial.println(y_center);
+        Serial.println(yI);
     }
-    
-    xI = x_center;
-    yI = y_center;
-    
-    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
-    servo_base_right_pos = newTheta_left;
-    servo_base_left_pos = newTheta_right;
-    
-    // start at center position
-    servo_base_right.write(servo_base_right_pos + servo_base_right_0);
-    servo_base_left.write(servo_base_left_pos + servo_base_left_0);
-    
-    // enable servo power after writing the position
-    digitalWrite(power_ctrl_pin, HIGH);
-    
-    //  Serial.println("Starting values: ");
-    //  Serial.print("Index dist: ");
-    //  Serial.println(servo_base_right.read());
-    //  Serial.print("Index prox: ");
-    //  Serial.println(servo_base_left.read());
-    
     
     if (!flag_input_from_ros) {
         Serial.println("Choose a direction:");
@@ -215,7 +222,7 @@ void execute_control() {
         badCoords = true;
     }
     
-    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
+//    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
     servo_base_right_pos = newTheta_left;
     servo_base_left_pos = newTheta_right;
     
@@ -238,13 +245,18 @@ void execute_control() {
     yI = y_center;
     xI = x_center;
     
-    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
+//    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
     servo_base_right_pos = newTheta_left;
     servo_base_left_pos = newTheta_right;
     
     coordinatedMovement(servo_base_right, servo_base_left, delta, 
             servo_base_right_pos + servo_base_right_0, 
             servo_base_left_pos + servo_base_left_0);
+}
+
+//----------------------------- main loop ------------------------------
+void state_machine() {
+    
 }
 
 //----------------------------- main loop ------------------------------
