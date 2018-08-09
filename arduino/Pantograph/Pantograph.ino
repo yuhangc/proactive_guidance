@@ -1,5 +1,4 @@
 
-
 // Pantograph.ino
 
 // Yuhang Che
@@ -11,14 +10,10 @@
 #include <ros.h>
 #include <std_msgs/String.h>
 
+#include <PantographDevice.h>
+
+// ros node handler
 ros::NodeHandle nh;
-
-// global flags to control program behavior
-static const bool resetOffsets = false;
-static const bool flag_input_from_ros = true;
-
-bool flag_input_updated;
-bool flag_action;
 
 // device configurations
 static const float a1 = 15.00;     // proximal motor upper arm [mm]
@@ -30,14 +25,32 @@ static const float a5 = 20.00;     // spacing between motors
 static const int power_ctrl_pin = 35;
 
 static const float servo_offset_left = 29;
-static const float servo_offset_left = 33;
+static const float servo_offset_right = 33;
 
 static const int servo_pin_left = 10;
 static const int servo_pin_right = 9;
 
-static const float goal_tol = 1;    // mm
+static const float goal_tol = 1;      // mm
 static const float rate_loop = 50;
+static const int dt_loop = 20;        // ms
 static const float rate_moving = 50;
+
+// global flags to control program behavior
+static const bool resetOffsets = false;
+static const bool flag_input_from_ros = true;
+
+bool flag_input_updated;
+bool flag_action;
+
+// state control
+enum {
+    Idle,
+    Moving,
+    Pausing,
+    Resetting
+} device_state;
+
+int t_pause_start;
 
 // workspace guides
 static const float r_max = 10;
@@ -56,15 +69,16 @@ const float dmag = 1.0;
 const float dpause = 0.2;
 const float mag_range[2] = {2.0, 8.0};
 const float pause_range[2] = {0.0, 1.0};
+const float rot_corr = -1;
 
 // a pantograph device pointer
-PantographDevice* device;
+PantographDevice device(a1, a2, a3, a4, a5, servo_pin_left, servo_pin_right,
+                        servo_offset_left, servo_offset_right, power_ctrl_pin);
+//PantographDevice* device;
 
 // a publisher
 std_msgs::String pub_msg;
 ros::Publisher test_pub("test_topic", &pub_msg);
-
-char test_str[] = "this is test";
 
 //----------------------------- callback functions ------------------------------
 String cmd_dir;
@@ -75,7 +89,6 @@ void ctrl_callback(const std_msgs::String& msg) {
 
 ros::Subscriber<std_msgs::String> sub("haptic_control", &ctrl_callback);
 
-
 //----------------------------- get input ------------------------------
 // block version
 char get_input_block() {
@@ -84,8 +97,6 @@ char get_input_block() {
     // input is either from keyboard or ros
     if (flag_input_from_ros) {
         while (!flag_input_updated) {
-            pub_msg.data = test_str;
-            test_pub.publish(&pub_msg);
             nh.spinOnce();
             delay(10);
         }
@@ -151,7 +162,7 @@ void clip(float& x, const float x_min, const float x_max) {
         x = x_max;
 }
 
-void dist(float x1, float y1, float x2, float y2) {
+float dist(float x1, float y1, float x2, float y2) {
     float x_diff = x1 - x2;
     float y_diff = y1 - y2;
     
@@ -170,14 +181,10 @@ void setup() {
         Serial.begin(38400);
     }
     
-    // create a pantograph device
-    device = new PantographDevice(a1, a2, a3, a4, a5, servo_pin_left, servo_pin_right,
-                                  servo_offset_left, servo_offset_right, power_ctrl_pin);
-
-    // set tolerance and loop rate
-    device->SetGoalReachingTool(goal_tol);
-    device->SetLoopRate(rate_loop, rate_moving);
-
+    // setup the device
+    device.Setup(goal_tol, rate_loop, rate_moving);
+    
+    device_state = Idle;
 
     // servo reset can only be adjusted through Serial Monitor
 //    if (!flag_input_from_ros && resetOffsets) {
@@ -192,7 +199,9 @@ void setup() {
         Serial.println(servo_offset_left);
     }
     
-    device->GetPos(xI, yI);
+    device.GetPos(xI, yI);
+    x_center = xI;
+    y_center = yI;
     
     if (!flag_input_from_ros) {
         Serial.print("x_center: ");
@@ -214,61 +223,77 @@ void setup() {
 }
 
 //----------------------------- main control ------------------------------
-void execute_control() {
-    int delta = 15;
+//void execute_control() {
+//    int delta = 15;
+//    
+//    // calculate new motor commands
+//    if ( (xI - x_center) * (xI - x_center) + (yI - y_center) * (yI - y_center) > r_max) {
+//        badCoords = true;
+//    }
+//    
+////    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
+//    servo_base_right_pos = newTheta_left;
+//    servo_base_left_pos = newTheta_right;
+//    
+//    // write motor commands (offset by starting position)
+//    if ( !badCoords) {
+//        coordinatedMovement(servo_base_right, servo_base_left, delta, 
+//            servo_base_right_pos + servo_base_right_0, 
+//            servo_base_left_pos + servo_base_left_0);
+//    }
+//    else {
+//        if (!flag_input_from_ros) {
+//            Serial.println("Bad Coordinates");
+//        }
+//    }
+//    
+//    // pause for 0.2s
+//    delay(pause*1000);
+//    
+//    // return to center
+//    yI = y_center;
+//    xI = x_center;
+//    
+////    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
+//    servo_base_right_pos = newTheta_left;
+//    servo_base_left_pos = newTheta_right;
+//    
+//    coordinatedMovement(servo_base_right, servo_base_left, delta, 
+//            servo_base_right_pos + servo_base_right_0, 
+//            servo_base_left_pos + servo_base_left_0);
+//}
+
+//----------------------------- state machine helpers ------------------------------
+void adjust_param(char dir_val) {
+    switch (dir_val) {
+    case 'w':
+        mag += dmag;
+        break;
     
-    // calculate new motor commands
-    if ( (xI - x_center) * (xI - x_center) + (yI - y_center) * (yI - y_center) > r_max) {
-        badCoords = true;
+    case 's':
+        mag -= dmag;
+        break;
+        
+    case 'a':
+        pause -= dpause;
+        break;
+        
+    case 'd':
+        pause += dpause;
+        break;
+    default:
+        break;
     }
     
-//    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
-    servo_base_right_pos = newTheta_left;
-    servo_base_left_pos = newTheta_right;
-    
-    // write motor commands (offset by starting position)
-    if ( !badCoords) {
-        coordinatedMovement(servo_base_right, servo_base_left, delta, 
-            servo_base_right_pos + servo_base_right_0, 
-            servo_base_left_pos + servo_base_left_0);
-    }
-    else {
-        if (!flag_input_from_ros) {
-            Serial.println("Bad Coordinates");
-        }
-    }
-    
-    // pause for 0.2s
-    delay(pause*1000);
-    
-    // return to center
-    yI = y_center;
-    xI = x_center;
-    
-//    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
-    servo_base_right_pos = newTheta_left;
-    servo_base_left_pos = newTheta_right;
-    
-    coordinatedMovement(servo_base_right, servo_base_left, delta, 
-            servo_base_right_pos + servo_base_right_0, 
-            servo_base_left_pos + servo_base_left_0);
+    // clip mag and pause
+    clip(mag, mag_range[0], mag_range[1]);
+    clip(pause, pause_range[0], pause_range[1]);
 }
 
-//----------------------------- main loop ------------------------------
-void state_machine() {
+void adjust_goal(char dir_val) {
+    const float mag_diag = mag * 0.8;
     
-}
-
-//----------------------------- main loop ------------------------------
-void loop() {
-    char directionVal;
-    float mag_diag = mag * 0.8;
-    float rot_corr = -1.0;
-    
-    directionVal = get_input();
-    
-    switch (directionVal) {                     //  apply new command
-    
+    switch (dir_val) {
     case 'I':                 // Forward
     case 'i':
     case '1':
@@ -313,38 +338,72 @@ void loop() {
         xI = xI + mag_diag * rot_corr;
         yI = yI + mag_diag * rot_corr;
         break;
-    
-    case 'K':               // Center
-    case 'k':
-    case '9':
-      yI = y_center;
-      xI = x_center;
-      break;
-      
-    case 'w':
-        mag += dmag;
-        break;
-    
-    case 's':
-        mag -= dmag;
-        break;
-        
-    case 'a':
-        pause -= dpause;
-        break;
-        
-    case 'd':
-        pause += dpause;
-        break;
-      
     }
-    
-    // clip mag and pause
-    clip(mag, mag_range[0], mag_range[1]);
-    clip(pause, pause_range[0], pause_range[1]);
-    
-    if (flag_action) {
-        execute_control();
+}
+
+//----------------------------- state machine ------------------------------
+void state_machine(char dir_val) {
+    switch (device_state) {
+        case Idle:
+            if (dir_val != 'n') {
+                if (flag_action) {
+                    adjust_goal(dir_val);
+                    
+                    device.SetGoal(xI, yI);
+                    device.ExecuteControl();
+                    
+                    device_state = Moving;
+                }
+                else {
+                    adjust_param(dir_val);
+                }
+            }
+            break;
+        case Moving:
+            // execute control
+            device.ExecuteControl();
+            
+            // check goal reached
+            if (device.GoalReached()) {
+                t_pause_start = millis();
+                device_state = Pausing;
+            }
+            break;
+        case Pausing:
+            int t_pause = millis() - t_pause_start;
+            if (t_pause >= pause * 1000) {
+                xI = x_center;
+                yI = y_center;
+                
+                device.SetGoal(xI, yI);
+                device.ExecuteControl();
+                
+                device_state = Resetting;
+            }
+            break;
+        case Resetting:
+            // execute control
+            device.ExecuteControl();
+            
+            // check goal reached
+            if (device.GoalReached()) {
+                device_state = Idle;
+            }
+            
+            break;
     }
+}
+
+//----------------------------- main loop ------------------------------
+void loop() {
+    int t_loop_start = millis();
+    
+    char directionVal;
+    directionVal = get_input();
+    
+    state_machine(directionVal);
+    
+    int t_loop = millis() - t_loop_start;
+    delay(dt_loop - t_loop);
 }
 
