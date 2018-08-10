@@ -33,11 +33,12 @@ static const int servo_pin_right = 9;
 static const float goal_tol = 1;      // mm
 static const float rate_loop = 50;
 static const int dt_loop = 20;        // ms
-static const float rate_moving = 50;
+static const float rate_moving = 100;
 
 // global flags to control program behavior
 static const bool resetOffsets = false;
-static const bool flag_input_from_ros = true;
+static const bool flag_input_from_ros = false;
+static const bool flag_print_debug = true;
 
 bool flag_input_updated;
 bool flag_action;
@@ -62,7 +63,7 @@ float yI;
 bool badCoords;
 
 // push maginitude and pause
-float mag = 0.4;
+float mag = 4.0;
 float pause = 0.2;
 
 const float dmag = 1.0;
@@ -74,7 +75,6 @@ const float rot_corr = -1;
 // a pantograph device pointer
 PantographDevice device(a1, a2, a3, a4, a5, servo_pin_left, servo_pin_right,
                         servo_offset_left, servo_offset_right, power_ctrl_pin);
-//PantographDevice* device;
 
 // a publisher
 std_msgs::String pub_msg;
@@ -218,50 +218,13 @@ void setup() {
         Serial.println("     L: Right");
         Serial.println("     K: Reset to center");
     }
+    
+    if (flag_print_debug) {
+        Serial.println("In state idle");
+    }
 
     flag_input_updated = false;
 }
-
-//----------------------------- main control ------------------------------
-//void execute_control() {
-//    int delta = 15;
-//    
-//    // calculate new motor commands
-//    if ( (xI - x_center) * (xI - x_center) + (yI - y_center) * (yI - y_center) > r_max) {
-//        badCoords = true;
-//    }
-//    
-////    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
-//    servo_base_right_pos = newTheta_left;
-//    servo_base_left_pos = newTheta_right;
-//    
-//    // write motor commands (offset by starting position)
-//    if ( !badCoords) {
-//        coordinatedMovement(servo_base_right, servo_base_left, delta, 
-//            servo_base_right_pos + servo_base_right_0, 
-//            servo_base_left_pos + servo_base_left_0);
-//    }
-//    else {
-//        if (!flag_input_from_ros) {
-//            Serial.println("Bad Coordinates");
-//        }
-//    }
-//    
-//    // pause for 0.2s
-//    delay(pause*1000);
-//    
-//    // return to center
-//    yI = y_center;
-//    xI = x_center;
-//    
-////    inverseKinematics(xI, yI, newTheta_left, newTheta_right);
-//    servo_base_right_pos = newTheta_left;
-//    servo_base_left_pos = newTheta_right;
-//    
-//    coordinatedMovement(servo_base_right, servo_base_left, delta, 
-//            servo_base_right_pos + servo_base_right_0, 
-//            servo_base_left_pos + servo_base_left_0);
-//}
 
 //----------------------------- state machine helpers ------------------------------
 void adjust_param(char dir_val) {
@@ -343,6 +306,8 @@ void adjust_goal(char dir_val) {
 
 //----------------------------- state machine ------------------------------
 void state_machine(char dir_val) {
+    float th_left, th_right;
+    
     switch (device_state) {
         case Idle:
             if (dir_val != 'n') {
@@ -353,6 +318,15 @@ void state_machine(char dir_val) {
                     device.ExecuteControl();
                     
                     device_state = Moving;
+                    
+                    if (flag_print_debug) {
+                        Serial.print("Goal is: ");
+                        Serial.print(xI);
+                        Serial.print(", ");
+                        Serial.println(yI);
+                        
+                        Serial.println("Switching to state moving");
+                    }
                 }
                 else {
                     adjust_param(dir_val);
@@ -361,17 +335,24 @@ void state_machine(char dir_val) {
             break;
         case Moving:
             // execute control
+            if (flag_print_debug) {
+                Serial.println("in state moving");
+            }
+            
             device.ExecuteControl();
             
             // check goal reached
             if (device.GoalReached()) {
                 t_pause_start = millis();
                 device_state = Pausing;
+                
+                if (flag_print_debug) {
+                    Serial.println("Switching to state pausing");
+                }
             }
             break;
         case Pausing:
-            int t_pause = millis() - t_pause_start;
-            if (t_pause >= pause * 1000) {
+            if (millis() - t_pause_start >= pause * 1000) {
                 xI = x_center;
                 yI = y_center;
                 
@@ -379,15 +360,30 @@ void state_machine(char dir_val) {
                 device.ExecuteControl();
                 
                 device_state = Resetting;
+                
+                if (flag_print_debug) {
+                    Serial.print("Goal is: ");
+                        Serial.print(xI);
+                        Serial.print(", ");
+                        Serial.println(yI);
+                        
+                    Serial.println("Switching to state resetting");
+                }
             }
             break;
         case Resetting:
+            Serial.println("in state resetting");
+            
             // execute control
             device.ExecuteControl();
             
             // check goal reached
             if (device.GoalReached()) {
                 device_state = Idle;
+                
+                if (flag_print_debug) {
+                    Serial.println("Goal reached, now going to idel");
+                }
             }
             
             break;
@@ -402,6 +398,8 @@ void loop() {
     directionVal = get_input();
     
     state_machine(directionVal);
+
+    // device.__DirectControl(20, 20);
     
     int t_loop = millis() - t_loop_start;
     delay(dt_loop - t_loop);

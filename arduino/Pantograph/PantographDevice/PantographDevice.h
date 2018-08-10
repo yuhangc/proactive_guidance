@@ -24,6 +24,21 @@ public:
         x_out = x;
         y_out = y;
     }
+
+	void GetPosJoint(float& left, float& right) {
+		left = th_left;
+		right = th_right;
+	}
+
+	void __DirectControl(int left, int right) {
+		servo_base_left.write(left);
+		servo_base_right.write(right);
+	}
+
+	void __DirectRead(int& left, int& right) {
+		left = servo_base_left.read();
+		right = servo_base_right.read();
+	}
     
 private:
     // link lengths
@@ -39,6 +54,8 @@ private:
 
 	// power pin
 	int power_pin;
+	int pin_left;
+	int pin_right;
     
     // workspace guides
     float x;
