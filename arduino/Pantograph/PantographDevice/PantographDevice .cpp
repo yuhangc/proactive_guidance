@@ -37,6 +37,9 @@ void PantographDevice::Setup(float tol, float rate, float rate_moving) {
 
     // give a little time for it to stabilize
     delay(200);
+
+	// set power back off
+	digitalWrite(power_pin, LOW);
 }
 
 void PantographDevice::SetGoal(float x_goal_new, float y_goal_new) {

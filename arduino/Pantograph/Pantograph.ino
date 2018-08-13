@@ -7,8 +7,14 @@
 
 #include <Servo.h>
 
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BNO055.h>
+#include <utility/imumaths.h>
+
 #include <ros.h>
 #include <std_msgs/String.h>
+#include <std_msgs/Float32MultiArray.h>
 
 #include <PantographDevice.h>
 
@@ -33,12 +39,11 @@ static const int servo_pin_right = 9;
 static const float goal_tol = 1;      // mm
 static const float rate_loop = 50;
 static const int dt_loop = 20;        // ms
-static const float rate_moving = 100;
+static const float rate_moving = 150;
 
 // global flags to control program behavior
-static const bool resetOffsets = false;
-static const bool flag_input_from_ros = false;
-static const bool flag_print_debug = true;
+static const bool flag_using_ros = true;
+static const bool flag_print_debug = false;
 
 bool flag_input_updated;
 bool flag_action;
@@ -46,12 +51,14 @@ bool flag_action;
 // state control
 enum {
     Idle,
+    Starting,
     Moving,
     Pausing,
     Resetting
 } device_state;
 
-int t_pause_start;
+unsigned long t_pause_start;
+unsigned long t_start;
 
 // workspace guides
 static const float r_max = 10;
@@ -75,10 +82,14 @@ const float rot_corr = -1;
 // a pantograph device pointer
 PantographDevice device(a1, a2, a3, a4, a5, servo_pin_left, servo_pin_right,
                         servo_offset_left, servo_offset_right, power_ctrl_pin);
+                        
+// a IMU class
+Adafruit_BNO055 bno = Adafruit_BNO055(55);
 
 // a publisher
-std_msgs::String pub_msg;
-ros::Publisher test_pub("test_topic", &pub_msg);
+std_msgs::Float32MultiArray rot_msg;
+ros::Publisher rot_pub("human_rotation", &rot_msg);
+float rot_val[3];
 
 //----------------------------- callback functions ------------------------------
 String cmd_dir;
@@ -90,45 +101,10 @@ void ctrl_callback(const std_msgs::String& msg) {
 ros::Subscriber<std_msgs::String> sub("haptic_control", &ctrl_callback);
 
 //----------------------------- get input ------------------------------
-// block version
-char get_input_block() {
-    char dir_val;
-    
-    // input is either from keyboard or ros
-    if (flag_input_from_ros) {
-        while (!flag_input_updated) {
-            nh.spinOnce();
-            delay(10);
-        }
-        
-        dir_val = cmd_dir[0];
-        flag_input_updated = false;
-    }
-    else {
-        // check for user input
-        while (Serial.available() == 0) { }
-    
-        // use only most recent variable
-        while (Serial.available() > 0) {
-            dir_val = Serial.read();
-        }
-    }
-    
-    if (dir_val == 'w' || dir_val == 's' || dir_val == 'a' || dir_val == 'd') {
-        flag_action = false;
-    }
-    else {
-        flag_action = true;
-    }
-    
-    return dir_val;
-}
-
-// none block version
 char get_input() {
     char dir_val;
     
-    if (flag_input_from_ros) {
+    if (flag_using_ros) {
         if (!flag_input_updated)
             return 'n';
 
@@ -171,28 +147,22 @@ float dist(float x1, float y1, float x2, float y2) {
 
 //----------------------------- main setup ------------------------------
 void setup() {
-    if (flag_input_from_ros) {
+    if (flag_using_ros) {
         nh.initNode();
         nh.subscribe(sub);
-        nh.advertise(test_pub);
+        nh.advertise(rot_pub);
     }
     else {
         // use serial monitor
-        Serial.begin(38400);
+        Serial.begin(115200);
     }
     
     // setup the device
     device.Setup(goal_tol, rate_loop, rate_moving);
     
     device_state = Idle;
-
-    // servo reset can only be adjusted through Serial Monitor
-//    if (!flag_input_from_ros && resetOffsets) {
-//        servo_base_right_0 = servoOffset(servo_base_right) - 90;
-//        servo_base_left_0 = servoOffset(servo_base_left) - 90;
-//    }
     
-    if (!flag_input_from_ros) {
+    if (!flag_using_ros) {
         Serial.print("servo_base_right Offset: ");
         Serial.print(servo_offset_right);
         Serial.print("   servo_base_left Offset: ");
@@ -203,14 +173,14 @@ void setup() {
     x_center = xI;
     y_center = yI;
     
-    if (!flag_input_from_ros) {
+    if (!flag_using_ros) {
         Serial.print("x_center: ");
         Serial.print(xI);
         Serial.print("   y_center: ");
         Serial.println(yI);
     }
     
-    if (!flag_input_from_ros) {
+    if (!flag_using_ros) {
         Serial.println("Choose a direction:");
         Serial.println("     I: Forward");
         Serial.println("     ,: Back");
@@ -224,6 +194,37 @@ void setup() {
     }
 
     flag_input_updated = false;
+    
+    // setup the IMU
+    if (!bno.begin()) {
+        if (flag_print_debug) {
+            Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
+        }
+        while(1);
+    }
+    
+    /* Use external crystal for better accuracy */
+    bno.setExtCrystalUse(true);
+   
+    /* Display some basic information on this sensor */
+    if (flag_print_debug) {
+        sensor_t sensor;
+        bno.getSensor(&sensor);
+        Serial.println("------------------------------------");
+        Serial.print  ("Sensor:       "); Serial.println(sensor.name);
+        Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
+        Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
+        Serial.print  ("Max Value:    "); Serial.print(sensor.max_value); Serial.println(" xxx");
+        Serial.print  ("Min Value:    "); Serial.print(sensor.min_value); Serial.println(" xxx");
+        Serial.print  ("Resolution:   "); Serial.print(sensor.resolution); Serial.println(" xxx");
+        Serial.println("------------------------------------");
+        Serial.println("");
+        delay(500);
+    }
+    
+    // ros message type
+    rot_msg.data_length = 3;
+    rot_msg.data = rot_val;
 }
 
 //----------------------------- state machine helpers ------------------------------
@@ -315,9 +316,10 @@ void state_machine(char dir_val) {
                     adjust_goal(dir_val);
                     
                     device.SetGoal(xI, yI);
-                    device.ExecuteControl();
+                    device.SetOn();
                     
-                    device_state = Moving;
+                    device_state = Starting;
+                    t_start = millis();
                     
                     if (flag_print_debug) {
                         Serial.print("Goal is: ");
@@ -331,6 +333,11 @@ void state_machine(char dir_val) {
                 else {
                     adjust_param(dir_val);
                 }
+            }
+            break;
+        case Starting:
+            if (millis() - t_start >= 160) {
+                device_state = Moving;
             }
             break;
         case Moving:
@@ -372,13 +379,12 @@ void state_machine(char dir_val) {
             }
             break;
         case Resetting:
-            Serial.println("in state resetting");
-            
             // execute control
             device.ExecuteControl();
             
             // check goal reached
             if (device.GoalReached()) {
+                device.SetOff();
                 device_state = Idle;
                 
                 if (flag_print_debug) {
@@ -394,14 +400,39 @@ void state_machine(char dir_val) {
 void loop() {
     int t_loop_start = millis();
     
+    // spin ros
+    if (flag_using_ros) {
+        nh.spinOnce();
+    }
+    
     char directionVal;
     directionVal = get_input();
     
     state_machine(directionVal);
+    
+    // update sensor reading
+    /* Get a new sensor event */
+    sensors_event_t event;
+    bno.getEvent(&event);
 
-    // device.__DirectControl(20, 20);
+    if (flag_using_ros) {
+        rot_msg.data[0] = (float)event.orientation.x;
+        rot_msg.data[1] = (float)event.orientation.y;
+        rot_msg.data[2] = (float)event.orientation.z;
+        
+        rot_pub.publish(&rot_msg);
+    }
+    else {
+        Serial.print(F("Orientation: "));
+        Serial.print((float)event.orientation.x);
+        Serial.print(F(" "));
+        Serial.print((float)event.orientation.y);
+        Serial.print(F(" "));
+        Serial.print((float)event.orientation.z);
+        Serial.println(F(""));
+    }
     
     int t_loop = millis() - t_loop_start;
-    delay(dt_loop - t_loop);
+    delay(20);
 }
 

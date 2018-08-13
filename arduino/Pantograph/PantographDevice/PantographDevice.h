@@ -11,6 +11,14 @@ public:
     
     void SetGoal(float x_goal_new, float y_goal_new);
 
+	void SetOff() {
+		digitalWrite(power_pin, LOW);
+	}
+	
+	void SetOn() {
+		digitalWrite(power_pin, HIGH);
+	}
+
     // control
     void ExecuteControl();        // for one time step
     void MoveToGoal(float x_goal_new, float y_goal_new);    // blocking until goal is reached
