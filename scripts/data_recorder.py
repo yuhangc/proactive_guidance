@@ -20,9 +20,9 @@ class DataLogger(object):
         self.t_hist = []
 
         # subscribers
-        self.human_pos_sub = rospy.Subscriber("/people_tracker_measurement", 1,
-                                               self.people_tracking_callback)
-        self.human_rot_sub = rospy.Subscriber("/human_rotation", 1,
+        self.human_pos_sub = rospy.Subscriber("/people_tracker_measurement", Float32MultiArray,
+                                              self.people_tracking_callback)
+        self.human_rot_sub = rospy.Subscriber("/human_rotation", PositionMeasurementArray,
                                               self.people_rot_callback)
 
         self.valid_range_x = (0.0, 5.0)
@@ -37,14 +37,13 @@ class DataLogger(object):
             self.save_file.write("{:f}, {:f}, {:f}, {:f}\n".format(self.t_meas, self.human_pose[0],
                                                                    self.human_pose[1], self.human_pose[2]))
         else:
-            self.t_hist.append(self.t_meas)
+            self.t_hist.append([self.t_meas])
             self.human_pose_hist.append(self.human_pose)
 
     def save_data(self, file_name=""):
         if self.flag_log_to_file:
             self.save_file.close()
         else:
-            self.save_file = open(self.save_path + "/" + file_name)
             data = np.hstack((np.asarray(self.t_hist), np.asarray(self.human_pose_hist)))
             np.savetxt(self.save_path + "/" + file_name, data, fmt="%.f", delimiter=", ")
 

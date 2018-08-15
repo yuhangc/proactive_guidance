@@ -47,6 +47,8 @@ class NaiveExperiment:
                 self.flag_start_trial = True
             elif key == 'e':
                 self.flag_end_trial = True
+            elif key == '\x03':
+                break
 
     def _loop(self, trial_start):
         trial = trial_start
@@ -83,8 +85,10 @@ class NaiveExperiment:
             rate.sleep()
 
     def run(self, trial_start):
-        key_thread = threading.Thread(target=self._monitor_key).start()
-        loop_thread = threading.Thread(target=self._loop, args=(trial_start)).start()
+        key_thread = threading.Thread(target=self._monitor_key)
+        loop_thread = threading.Thread(target=self._loop, args=[trial_start])
+        key_thread.start()
+        loop_thread.start()
         key_thread.join()
         loop_thread.join()
 
