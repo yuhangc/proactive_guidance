@@ -70,14 +70,12 @@ float yI;
 bool badCoords;
 
 // push maginitude and pause
+float dir = 0;
 float mag = 4.0;
 float pause = 0.2;
 
-const float dmag = 1.0;
-const float dpause = 0.2;
-const float mag_range[2] = {2.0, 8.0};
-const float pause_range[2] = {0.0, 1.0};
 const float rot_corr = -1;
+const char dir_char_map[] = {'i', 'o', 'l', '.', ',', 'm', 'j', 'u'};
 
 // a pantograph device pointer
 PantographDevice device(a1, a2, a3, a4, a5, servo_pin_left, servo_pin_right,
@@ -92,13 +90,14 @@ ros::Publisher rot_pub("human_rotation", &rot_msg);
 float rot_val[3];
 
 //----------------------------- callback functions ------------------------------
-String cmd_dir;
-void ctrl_callback(const std_msgs::String& msg) {
-    cmd_dir = msg.data;
+void ctrl_callback(const std_msgs::Float32MultiArray& msg) {
+    dir = msg.data[0];
+    mag = msg.data[1];
+    pause = msg.data[2];
     flag_input_updated = true;
 }
 
-ros::Subscriber<std_msgs::String> sub("haptic_control", &ctrl_callback);
+ros::Subscriber<std_msgs::Float32MultiArray> sub("haptic_control", &ctrl_callback);
 
 //----------------------------- get input ------------------------------
 char get_input() {
@@ -108,7 +107,7 @@ char get_input() {
         if (!flag_input_updated)
             return 'n';
 
-        dir_val = cmd_dir[0];
+        dir_val = dir_char_map[(int)dir];
         flag_input_updated = false;
     }
     else {
@@ -118,13 +117,6 @@ char get_input() {
         while (Serial.available()) {
             dir_val = Serial.read();
         }
-    }
-
-    if (dir_val == 'w' || dir_val == 's' || dir_val == 'a' || dir_val == 'd') {
-        flag_action = false;
-    }
-    else {
-        flag_action = true;
     }
     
     return dir_val;
@@ -228,32 +220,6 @@ void setup() {
 }
 
 //----------------------------- state machine helpers ------------------------------
-void adjust_param(char dir_val) {
-    switch (dir_val) {
-    case 'w':
-        mag += dmag;
-        break;
-    
-    case 's':
-        mag -= dmag;
-        break;
-        
-    case 'a':
-        pause -= dpause;
-        break;
-        
-    case 'd':
-        pause += dpause;
-        break;
-    default:
-        break;
-    }
-    
-    // clip mag and pause
-    clip(mag, mag_range[0], mag_range[1]);
-    clip(pause, pause_range[0], pause_range[1]);
-}
-
 void adjust_goal(char dir_val) {
     const float mag_diag = mag * 0.8;
     
@@ -312,26 +278,21 @@ void state_machine(char dir_val) {
     switch (device_state) {
         case Idle:
             if (dir_val != 'n') {
-                if (flag_action) {
-                    adjust_goal(dir_val);
+                adjust_goal(dir_val);
                     
-                    device.SetGoal(xI, yI);
-                    device.SetOn();
+                device.SetGoal(xI, yI);
+                device.SetOn();
                     
-                    device_state = Starting;
-                    t_start = millis();
+                device_state = Starting;
+                t_start = millis();
                     
-                    if (flag_print_debug) {
-                        Serial.print("Goal is: ");
-                        Serial.print(xI);
-                        Serial.print(", ");
-                        Serial.println(yI);
+                if (flag_print_debug) {
+                    Serial.print("Goal is: ");
+                    Serial.print(xI);
+                    Serial.print(", ");
+                    Serial.println(yI);
                         
-                        Serial.println("Switching to state moving");
-                    }
-                }
-                else {
-                    adjust_param(dir_val);
+                    Serial.println("Switching to state moving");
                 }
             }
             break;

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from std_msgs.msg import String
+from std_msgs.msg import Float32MultiArray
 
 import numpy as np
 from utils import getKey
@@ -22,7 +22,8 @@ CTRL-C to quit
 """
 
 
-ctrl_keys = ['u', 'i', 'o', 'j', 'k', 'l', 'm', ',', '.']
+ctrl_keys = ['u', 'i', 'o', 'j', 'l', 'm', ',', '.']
+key_dir_dict = {'i': 0, 'o': 1, 'l': 2, '.': 3, ',': 4, 'm': 5, 'j': 6, 'u': 7}
 adj_keys = ['w', 's', 'a', 'd']
 
 mag = 4.0       # mm
@@ -36,15 +37,17 @@ pause_range = (0.0, 1.0)
 if __name__ == "__main__":
     rospy.init_node('haptic_ctrl')
 
-    pub = rospy.Publisher("haptic_control", String)
+    pub = rospy.Publisher("haptic_control", Float32MultiArray)
 
     print msg_init
 
     while True:
         key = getKey()
         if key in ctrl_keys:
-            msg = String()
-            msg.data = key
+            msg = Float32MultiArray()
+            msg.data.append(key_dir_dict[key])
+            msg.data.append(mag)
+            msg.data.append(pause)
             pub.publish(msg)
         elif key in adj_keys:
             if key == 'w':
@@ -62,11 +65,6 @@ if __name__ == "__main__":
 
             # print out information
             print "magnitude is: ", mag, "mm,  pause is: ", pause, "s"
-
-            # publish
-            msg = String()
-            msg.data = key
-            pub.publish(msg)
         else:
             if key == '\x03':
                 break
