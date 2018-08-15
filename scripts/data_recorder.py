@@ -13,9 +13,11 @@ class DataLogger(object):
 
         self.human_pose = np.zeros((3,))
         self.human_vel = np.zeros((3, ))
+        self.t_meas = rospy.get_time()
 
         self.human_pose_hist = []
         self.human_vel_hist = []
+        self.t_hist = []
 
         # subscribers
         self.human_pos_sub = rospy.Subscriber("/people_tracker_measurement", 1,
@@ -32,15 +34,24 @@ class DataLogger(object):
 
     def log(self):
         if self.flag_log_to_file:
-            pass
+            self.save_file.write("{:f}, {:f}, {:f}, {:f}\n".format(self.t_meas, self.human_pose[0],
+                                                                   self.human_pose[1], self.human_pose[2]))
         else:
+            self.t_hist.append(self.t_meas)
             self.human_pose_hist.append(self.human_pose)
 
-    def save_data(self, file_name):
-        pass
+    def save_data(self, file_name=""):
+        if self.flag_log_to_file:
+            self.save_file.close()
+        else:
+            self.save_file = open(self.save_path + "/" + file_name)
+            data = np.hstack((np.asarray(self.t_hist), np.asarray(self.human_pose_hist)))
+            np.savetxt(self.save_path + "/" + file_name, data, fmt="%.f", delimiter=", ")
 
     def reset(self):
-        pass
+        self.human_pose_hist = []
+        self.human_vel_hist = []
+        self.t_hist = []
 
     def filter_measurement(self, position):
         if position.x < self.valid_range_x[0] or position.x > self.valid_range_x[1] or \
@@ -53,6 +64,7 @@ class DataLogger(object):
         # filter out outliers
         for people in tracking_msg.people:
             if self.filter_measurement(people.position):
+                self.t_meas = rospy.get_time()
                 self.human_pose[0] = people.position.x
                 self.human_pose[1] = people.position.y
                 break
@@ -65,9 +77,11 @@ if __name__ == "__main__":
     rospy.init_node("exp_data_logger")
 
     save_path = rospy.get_param("~save_path", ".")
-    logger = DataLogger(save_path)
+    logger = DataLogger(save_path, True, file_name="test.txt")
 
     rate = rospy.Rate(40)
     while not rospy.is_shutdown():
         logger.log()
         rate.sleep()
+
+    logger.save_data()

@@ -3,8 +3,7 @@ import rospy
 from std_msgs.msg import String
 
 import numpy as np
-
-import sys, select, termios, tty
+from utils import getKey
 
 msg_init = """
 Send command to the haptic device
@@ -34,21 +33,7 @@ mag_range = (2.0, 8.0)
 pause_range = (0.0, 1.0)
 
 
-def getKey():
-    tty.setraw(sys.stdin.fileno())
-    rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
-    if rlist:
-        key = sys.stdin.read(1)
-    else:
-        key = ''
-
-    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
-    return key
-
-
-if __name__=="__main__":
-    settings = termios.tcgetattr(sys.stdin)
-
+if __name__ == "__main__":
     rospy.init_node('haptic_ctrl')
 
     pub = rospy.Publisher("haptic_control", String)
