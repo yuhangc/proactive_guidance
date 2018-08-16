@@ -59,6 +59,7 @@ enum {
 
 unsigned long t_pause_start;
 unsigned long t_start;
+unsigned long t_last;
 
 // workspace guides
 static const float r_max = 10;
@@ -89,12 +90,21 @@ std_msgs::Float32MultiArray rot_msg;
 ros::Publisher rot_pub("human_rotation", &rot_msg);
 float rot_val[3];
 
+std_msgs::String ctrl_received_msg;
+ros::Publisher ctrl_received_pub("ctrl_received", &ctrl_received_msg);
+
 //----------------------------- callback functions ------------------------------
 void ctrl_callback(const std_msgs::Float32MultiArray& msg) {
     dir = msg.data[0];
     mag = msg.data[1];
     pause = msg.data[2];
     flag_input_updated = true;
+    
+    static int count = 0;
+    ++count;
+    String msg_data = "received" + String(count);
+    ctrl_received_msg.data = msg_data.c_str();
+    ctrl_received_pub.publish(&ctrl_received_msg);
 }
 
 ros::Subscriber<std_msgs::Float32MultiArray> sub("haptic_control", &ctrl_callback);
@@ -143,6 +153,7 @@ void setup() {
         nh.initNode();
         nh.subscribe(sub);
         nh.advertise(rot_pub);
+        nh.advertise(ctrl_received_pub);
     }
     else {
         // use serial monitor
@@ -217,6 +228,9 @@ void setup() {
     // ros message type
     rot_msg.data_length = 3;
     rot_msg.data = rot_val;
+    
+    // t start
+    t_last = millis();
 }
 
 //----------------------------- state machine helpers ------------------------------
@@ -359,41 +373,42 @@ void state_machine(char dir_val) {
 
 //----------------------------- main loop ------------------------------
 void loop() {
-    int t_loop_start = millis();
+    unsigned long t_curr = millis();
     
-    // spin ros
-    if (flag_using_ros) {
-        nh.spinOnce();
-    }
+    if (t_curr - t_last >= dt_loop) {
+        char directionVal;
+        directionVal = get_input();
     
-    char directionVal;
-    directionVal = get_input();
+//        state_machine(directionVal);
     
-    state_machine(directionVal);
-    
-    // update sensor reading
-    /* Get a new sensor event */
-    sensors_event_t event;
-    bno.getEvent(&event);
+        // update sensor reading
+        /* Get a new sensor event */
+        sensors_event_t event;
+        bno.getEvent(&event);
 
-    if (flag_using_ros) {
-        rot_msg.data[0] = (float)event.orientation.x;
-        rot_msg.data[1] = (float)event.orientation.y;
-        rot_msg.data[2] = (float)event.orientation.z;
+        if (flag_using_ros) {
+            rot_msg.data[0] = (float)event.orientation.x;
+            rot_msg.data[1] = (float)event.orientation.y;
+            rot_msg.data[2] = (float)event.orientation.z;
         
-        rot_pub.publish(&rot_msg);
+            rot_pub.publish(&rot_msg);
+        }
+        else {
+            Serial.print(F("Orientation: "));
+            Serial.print((float)event.orientation.x);
+            Serial.print(F(" "));
+            Serial.print((float)event.orientation.y);
+            Serial.print(F(" "));
+            Serial.print((float)event.orientation.z);
+            Serial.println(F(""));
+        }
+
+        // spin ros
+        if (flag_using_ros) {
+            nh.spinOnce();
+        }
+        
+        t_last = t_curr;
     }
-    else {
-        Serial.print(F("Orientation: "));
-        Serial.print((float)event.orientation.x);
-        Serial.print(F(" "));
-        Serial.print((float)event.orientation.y);
-        Serial.print(F(" "));
-        Serial.print((float)event.orientation.z);
-        Serial.println(F(""));
-    }
-    
-    int t_loop = millis() - t_loop_start;
-    delay(20);
 }
 
