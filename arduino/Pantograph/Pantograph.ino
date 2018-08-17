@@ -5,7 +5,7 @@
 // Adapted from Julie Walker
 // Created on July 27, 2018
 
-#include <Servo.h>
+#include <PWMServo.h>
 
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
@@ -33,8 +33,11 @@ static const int power_ctrl_pin = 35;
 static const float servo_offset_left = 29;
 static const float servo_offset_right = 33;
 
-static const int servo_pin_left = 10;
-static const int servo_pin_right = 9;
+//static const int servo_pin_left = 10;
+//static const int servo_pin_right = 9;
+
+static const int servo_pin_left = SERVO_PIN_B;
+static const int servo_pin_right = SERVO_PIN_A;
 
 static const float goal_tol = 1;      // mm
 static const float rate_loop = 50;
@@ -379,7 +382,7 @@ void loop() {
         char directionVal;
         directionVal = get_input();
     
-//        state_machine(directionVal);
+        state_machine(directionVal);
     
         // update sensor reading
         /* Get a new sensor event */
