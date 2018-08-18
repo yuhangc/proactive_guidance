@@ -30,14 +30,16 @@ static const float a5 = 20.00;     // spacing between motors
 
 static const int power_ctrl_pin = 35;
 
-static const float servo_offset_left = 29;
-static const float servo_offset_right = 33;
+//static const float servo_offset_left = 29;
+//static const float servo_offset_right = 33;
+static const float servo_offset_left = 3;
+static const float servo_offset_right = -1;
 
 //static const int servo_pin_left = 10;
 //static const int servo_pin_right = 9;
 
-static const int servo_pin_left = SERVO_PIN_B;
-static const int servo_pin_right = SERVO_PIN_A;
+static const int servo_pin_left = SERVO_PIN_A;
+static const int servo_pin_right = SERVO_PIN_B;
 
 static const float goal_tol = 1;      // mm
 static const float rate_loop = 50;
@@ -103,11 +105,11 @@ void ctrl_callback(const std_msgs::Float32MultiArray& msg) {
     pause = msg.data[2];
     flag_input_updated = true;
     
-    static int count = 0;
-    ++count;
-    String msg_data = "received" + String(count);
-    ctrl_received_msg.data = msg_data.c_str();
-    ctrl_received_pub.publish(&ctrl_received_msg);
+//    static int count = 0;
+//    ++count;
+//    String msg_data = "received" + String(count);
+//    ctrl_received_msg.data = msg_data.c_str();
+//    ctrl_received_pub.publish(&ctrl_received_msg);
 }
 
 ros::Subscriber<std_msgs::Float32MultiArray> sub("haptic_control", &ctrl_callback);
@@ -156,7 +158,7 @@ void setup() {
         nh.initNode();
         nh.subscribe(sub);
         nh.advertise(rot_pub);
-        nh.advertise(ctrl_received_pub);
+//        nh.advertise(ctrl_received_pub);
     }
     else {
         // use serial monitor
@@ -254,36 +256,36 @@ void adjust_goal(char dir_val) {
     case 'L':                 // Left
     case 'l':
     case '3':
-        yI = yI + mag * rot_corr;
+        yI = yI - mag * rot_corr;
         break;
     
     case 'J':               // Right
     case 'j':
     case '4':
-        yI = yI - mag * rot_corr;
+        yI = yI + mag * rot_corr;
         break;
     
     case 'u':
     case 'U':
         xI = xI - mag_diag * rot_corr;
-        yI = yI - mag_diag * rot_corr;
+        yI = yI + mag_diag * rot_corr;
         break;
         
     case 'o':
     case 'O':
         xI = xI - mag_diag * rot_corr;
-        yI = yI + mag_diag * rot_corr;
+        yI = yI - mag_diag * rot_corr;
         break;
         
     case 'm':
     case 'M':
         xI = xI + mag_diag * rot_corr;
-        yI = yI - mag_diag * rot_corr;
+        yI = yI + mag_diag * rot_corr;
         break;
         
     case '.':
         xI = xI + mag_diag * rot_corr;
-        yI = yI + mag_diag * rot_corr;
+        yI = yI - mag_diag * rot_corr;
         break;
     }
 }

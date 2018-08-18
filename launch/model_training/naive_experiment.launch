@@ -1,9 +1,13 @@
 <launch>
     <arg name="protocol" default="random" />
     <arg name="exp_id" default="test0" />
+	<arg name="mode" default="manual" />
 
     <node name="naive_experiment" pkg="proactive_guidance" type="naive_experiment.py" output="screen">
         <param name="protocol_file" value="$(find proactive_guidance)/resources/protocols/$(arg protocol)_protocol.txt"/>
         <param name="path_saving" value="$(env HOME)/Documents/proactive_guidance/training_data/$(arg exp_id)"/>
+		<param name="mode" value="$(arg mode)" />
+		<param name="t_render" type="double" value="5.0" />
+		<param name="t_pause" type="double" value="5.0" />
     </node>
 </launch>

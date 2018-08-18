@@ -1,5 +1,5 @@
 #include "Arduino.h"
-#include "Servo.h"
+#include "PWMServo.h"
 
 class PantographDevice {
 public:
@@ -57,8 +57,8 @@ private:
     float a5;
     
     // servo motor
-    Servo servo_base_right;
-    Servo servo_base_left;
+    PWMServo servo_base_right;
+    PWMServo servo_base_left;
 
 	// power pin
 	int power_pin;

@@ -1,9 +1,31 @@
+#include <Servo.h>
 
-// STARTUP OFFSET ADJUSTMENT ///////////////////////////////////////////////////////////////////
+static const int servo_pin_left = 12;
+static const int servo_pin_right = 11;
+static const int power_pin = 35;
+
+Servo servo_left;
+Servo servo_right;
+
+void setup() {
+    // use serial monitor
+    Serial.begin(57600);
+    
+    servo_left.attach(servo_pin_left);
+    servo_right.attach(servo_pin_right);
+    
+    pinMode(power_pin, OUTPUT);
+    digitalWrite(power_pin, HIGH);
+    
+    servoOffset(servo_left);
+    servoOffset(servo_right);
+    
+    digitalWrite(power_pin, LOW);
+}
+
+// calibrate the offset of servos
 int servoOffset(Servo s) {
-    if (!flag_input_from_ros) {
-        Serial.println("Press H,J,L,; to move servo arm to straight down. Press A when done");
-    }
+  Serial.println("Press H,J,L,; to move servo arm to straight down. Press A when done");
 
   bool setPointFound = false;
   char userInput = 'v';
@@ -47,3 +69,6 @@ int servoOffset(Servo s) {
   }
 }
 
+void loop() {
+    
+}

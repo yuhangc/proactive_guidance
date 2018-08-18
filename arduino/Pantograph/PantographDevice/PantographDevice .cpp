@@ -23,7 +23,7 @@ void PantographDevice::Setup(float tol, float rate, float rate_moving) {
 
 	// compute and move to center
     x_goal = -a5 / 2;
-    y_goal = 3.0 * sqrt((a1 + a2) * (a1 + a2) - (0.5 * a5) * (0.5 * a5)) / 4.0;
+    y_goal = 3.0 * sqrt((a1 + a2) * (a1 + a2) - (0.5 * a5) * (0.5 * a5)) / 4.0 + 1.0;
 	x = x_goal;
 	y = y_goal;
 
