@@ -25,8 +25,8 @@ class DataLogger(object):
         self.human_rot_sub = rospy.Subscriber("/human_rotation", Float32MultiArray,
                                               self.people_rot_callback)
 
-        self.valid_range_x = (0.0, 5.0)
-        self.valid_range_y = (0.0, 5.0)
+        self.valid_range_x = (0.2, 10.0)
+        self.valid_range_y = (0.2, 10.0)
 
         # open file if in direct mode
         if self.flag_log_to_file:

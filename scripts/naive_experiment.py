@@ -16,8 +16,8 @@ class NaiveExperiment:
         # get protocol
         protocol_file = rospy.get_param("~protocol_file", "protocol.txt")
         self.mode = rospy.get_param("~mode", "manual")      # can be 'manual' or 'auto'
-        self.t_render_inc = rospy.get_param("~t_render_inc", 2)
-        self.t_render_offset = rospy.get_param("~t_render_offset", 3)
+        self.t_render_inc = rospy.get_param("~t_render_inc", 1)
+        self.t_render_offset = rospy.get_param("~t_render_offset", 5)
         self.t_pause = rospy.get_param("~t_pause", 3)
 
         self.t_trans = None
@@ -85,6 +85,14 @@ class NaiveExperiment:
                     self.flag_is_saving = False
                     self.flag_end_trial = False
                     self.flag_start_trial = False
+
+                    # send another feedback to remind user
+                    haptic_msg = Float32MultiArray()
+                    haptic_msg.data.append(self.dir[trial])
+                    haptic_msg.data.append(self.mag_offset)
+                    haptic_msg.data.append(self.pause_offset)
+
+                    self.haptic_msg_pub.publish(haptic_msg)
 
                     print "Trial ", trial, " ended\r"
                     trial += 1
