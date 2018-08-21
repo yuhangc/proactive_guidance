@@ -2,7 +2,7 @@
 import numpy as np
 
 import rospy
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import String
 from people_msgs.msg import PositionMeasurementArray
 
 import threading
@@ -41,7 +41,7 @@ class NaiveExperiment:
         self.flag_is_saving = False
 
         # create publisher
-        self.haptic_msg_pub = rospy.Publisher("/haptic_control", Float32MultiArray, queue_size=1)
+        self.haptic_msg_pub = rospy.Publisher("/haptic_control", String, queue_size=1)
 
     def load_protocol(self, protocol_file):
         protocol_data = np.loadtxt(protocol_file, delimiter=", ")
@@ -87,10 +87,9 @@ class NaiveExperiment:
                     self.flag_start_trial = False
 
                     # send another feedback to remind user
-                    haptic_msg = Float32MultiArray()
-                    haptic_msg.data.append(self.dir[trial])
-                    haptic_msg.data.append(self.mag_offset)
-                    haptic_msg.data.append(self.pause_offset)
+                    haptic_msg = String()
+                    haptic_msg.data = "{:d}{:d}{:d}".format(int(self.dir[trial]), 0, 0)
+                    print haptic_msg.data
 
                     self.haptic_msg_pub.publish(haptic_msg)
 
@@ -104,10 +103,11 @@ class NaiveExperiment:
                 # check for start trial
                 if self.flag_start_trial:
                     # publish haptic feedback
-                    haptic_msg = Float32MultiArray()
-                    haptic_msg.data.append(self.dir[trial])
-                    haptic_msg.data.append(self.mag[trial] * self.mag_inc + self.mag_offset)
-                    haptic_msg.data.append(self.mag[trial] * self.pause_inc + self.pause_offset)
+                    haptic_msg = String()
+                    haptic_msg.data = "{:d}{:d}{:d}".format(int(self.dir[trial]),
+                                                            int(self.mag[trial]),
+                                                            int(self.mag[trial]))
+                    print haptic_msg.data
 
                     self.haptic_msg_pub.publish(haptic_msg)
 

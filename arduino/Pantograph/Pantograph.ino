@@ -47,7 +47,7 @@ static const int dt_loop = 20;        // ms
 static const float rate_moving = 150;
 
 // global flags to control program behavior
-static const bool flag_using_ros = true;
+static const bool flag_using_ros = false;
 static const bool flag_print_debug = false;
 
 bool flag_input_updated;
@@ -82,6 +82,8 @@ float pause = 0.2;
 
 const float rot_corr = -1;
 const char dir_char_map[] = {'i', 'o', 'l', '.', ',', 'm', 'j', 'u'};
+const float mag_map[] = {2, 4, 6};
+const float pause_map[] = {0.1, 0.2, 0.3};
 
 // a pantograph device pointer
 PantographDevice device(a1, a2, a3, a4, a5, servo_pin_left, servo_pin_right,
@@ -105,11 +107,11 @@ void ctrl_callback(const std_msgs::Float32MultiArray& msg) {
     pause = msg.data[2];
     flag_input_updated = true;
     
-//    static int count = 0;
-//    ++count;
-//    String msg_data = "received" + String(count);
-//    ctrl_received_msg.data = msg_data.c_str();
-//    ctrl_received_pub.publish(&ctrl_received_msg);
+    static int count = 0;
+    ++count;
+    String msg_data = "received" + String(count);
+    ctrl_received_msg.data = msg_data.c_str();
+    ctrl_received_pub.publish(&ctrl_received_msg);
 }
 
 ros::Subscriber<std_msgs::Float32MultiArray> sub("haptic_control", &ctrl_callback);
@@ -129,8 +131,19 @@ char get_input() {
         if (!Serial.available())
             return 'n';
 
+        // first char is dir, second is mag, third is pause
+        char val = Serial.read();
+        dir_val = dir_char_map[val - '0'];
+        
+        val = Serial.read();
+        mag = mag_map[val - '0'];
+        
+        val = Serial.read();
+        pause = pause_map[val - '0'];
+        
+        // clear the rest of input buffer
         while (Serial.available()) {
-            dir_val = Serial.read();
+            val = Serial.read();
         }
     }
     
@@ -170,7 +183,7 @@ void setup() {
     
     device_state = Idle;
     
-    if (!flag_using_ros) {
+    if (flag_print_debug) {
         Serial.print("servo_base_right Offset: ");
         Serial.print(servo_offset_right);
         Serial.print("   servo_base_left Offset: ");
@@ -181,14 +194,14 @@ void setup() {
     x_center = xI;
     y_center = yI;
     
-    if (!flag_using_ros) {
+    if (flag_print_debug) {
         Serial.print("x_center: ");
         Serial.print(xI);
         Serial.print("   y_center: ");
         Serial.println(yI);
     }
     
-    if (!flag_using_ros) {
+    if (flag_print_debug) {
         Serial.println("Choose a direction:");
         Serial.println("     I: Forward");
         Serial.println("     ,: Back");
@@ -399,13 +412,15 @@ void loop() {
             rot_pub.publish(&rot_msg);
         }
         else {
-            Serial.print(F("Orientation: "));
+            if (flag_print_debug) {
+                Serial.print(F("Orientation: "));
+            }
             Serial.print((float)event.orientation.x);
-            Serial.print(F(" "));
+            Serial.print(F(", "));
             Serial.print((float)event.orientation.y);
-            Serial.print(F(" "));
-            Serial.print((float)event.orientation.z);
-            Serial.println(F(""));
+            Serial.print(F(", "));
+            Serial.println((float)event.orientation.z);
+//            Serial.println(F(""));
         }
 
         // spin ros
