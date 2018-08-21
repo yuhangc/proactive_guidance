@@ -42,9 +42,10 @@ static const int servo_pin_left = SERVO_PIN_A;
 static const int servo_pin_right = SERVO_PIN_B;
 
 static const float goal_tol = 1;      // mm
-static const float rate_loop = 50;
-static const int dt_loop = 20;        // ms
+static const float rate_loop = 80;
+static const float dt_loop = 1000.0/rate_loop;        // ms
 static const float rate_moving = 150;
+static const int imu_reading_nskip = 1;
 
 // global flags to control program behavior
 static const bool flag_using_ros = false;
@@ -65,6 +66,9 @@ enum {
 unsigned long t_pause_start;
 unsigned long t_start;
 unsigned long t_last;
+
+float t_next;
+int nskipped;
 
 // workspace guides
 static const float r_max = 10;
@@ -248,7 +252,8 @@ void setup() {
     rot_msg.data = rot_val;
     
     // t start
-    t_last = millis();
+    t_next = millis();
+    nskipped = 0;
 }
 
 //----------------------------- state machine helpers ------------------------------
@@ -393,34 +398,40 @@ void state_machine(char dir_val) {
 void loop() {
     unsigned long t_curr = millis();
     
-    if (t_curr - t_last >= dt_loop) {
+    if (t_curr >= t_next) {
         char directionVal;
         directionVal = get_input();
     
         state_machine(directionVal);
     
-        // update sensor reading
+        // update sensor reading every n loops
         /* Get a new sensor event */
-        sensors_event_t event;
-        bno.getEvent(&event);
+        if (nskipped >= imu_reading_nskip) {
+            sensors_event_t event;
+            bno.getEvent(&event);
 
-        if (flag_using_ros) {
-            rot_msg.data[0] = (float)event.orientation.x;
-            rot_msg.data[1] = (float)event.orientation.y;
-            rot_msg.data[2] = (float)event.orientation.z;
-        
-            rot_pub.publish(&rot_msg);
-        }
-        else {
-            if (flag_print_debug) {
-                Serial.print(F("Orientation: "));
+            if (flag_using_ros) {
+                rot_msg.data[0] = (float)event.orientation.x;
+                rot_msg.data[1] = (float)event.orientation.y;
+                rot_msg.data[2] = (float)event.orientation.z;
+
+                rot_pub.publish(&rot_msg);
             }
-            Serial.print((float)event.orientation.x);
-            Serial.print(F(", "));
-            Serial.print((float)event.orientation.y);
-            Serial.print(F(", "));
-            Serial.println((float)event.orientation.z);
+            else {
+                if (flag_print_debug) {
+                    Serial.print(F("Orientation: "));
+                }
+                Serial.print((float)event.orientation.x);
+                Serial.print(F(", "));
+                Serial.print((float)event.orientation.y);
+                Serial.print(F(", "));
+                Serial.println((float)event.orientation.z);
 //            Serial.println(F(""));
+            }
+
+            nskipped = 0;
+        } else {
+            nskipped += 1;
         }
 
         // spin ros
@@ -428,7 +439,7 @@ void loop() {
             nh.spinOnce();
         }
         
-        t_last = t_curr;
+        t_next += dt_loop;
     }
 }
 

@@ -80,7 +80,6 @@ class NaiveExperiment:
                 # check for end trial
                 if self.flag_end_trial:
                     self.logger.save_data(file_name="trial{}.txt".format(trial))
-                    self.logger.reset()
 
                     self.flag_is_saving = False
                     self.flag_end_trial = False
@@ -89,7 +88,6 @@ class NaiveExperiment:
                     # send another feedback to remind user
                     haptic_msg = String()
                     haptic_msg.data = "{:d}{:d}{:d}".format(int(self.dir[trial]), 0, 0)
-                    print haptic_msg.data
 
                     self.haptic_msg_pub.publish(haptic_msg)
 
@@ -117,6 +115,9 @@ class NaiveExperiment:
                     self.flag_end_trial = False
 
                     t_render = self.mag[trial] * self.t_render_inc + self.t_render_offset
+
+                    # reset logger
+                    self.logger.reset()
 
                     print "Trial ", trial, " started...\r"
 
