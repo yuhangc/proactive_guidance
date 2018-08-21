@@ -12,12 +12,12 @@ class Tester(object):
 
         self.haptic_msg_pub = rospy.Publisher("/haptic_control", Float32MultiArray, queue_size=1)
         self.ctrl_sub = rospy.Subscriber("/ctrl_received", String, self.received_callback)
-        self.ctrl_sub2 = rospy.Subscriber("/ctrl_received_listener", String, self.lintener_callback)
+        self.ctrl_sub2 = rospy.Subscriber("/ctrl_received_listener", String, self.listener_callback)
 
     def received_callback(self, msg):
         self.counter_received += 1
 
-    def lintener_callback(self, msg):
+    def listener_callback(self, msg):
         self.counter_listener += 1
 
     def run(self, freq):
@@ -45,4 +45,4 @@ if __name__ == '__main__':
     rospy.init_node("serial_test")
 
     tester = Tester()
-    tester.run(2)
+    tester.run(20)

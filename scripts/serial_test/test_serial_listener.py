@@ -8,14 +8,15 @@ class Listener(object):
     def __init__(self):
         self.counter_received = 0
 
-        self.haptic_msg_pub = rospy.Publisher("/haptic_control", Float32MultiArray, queue_size=1)
-        self.ctrl_sub = rospy.Subscriber("/ctrl_received_listener", String, self.received_callback)
+        self.haptic_msg_sub = rospy.Subscriber("/haptic_control", Float32MultiArray, self.received_callback)
+        self.ctrl_pub = rospy.Publisher("/ctrl_received_listener", String, queue_size=1)
 
     def received_callback(self, msg):
         self.counter_received += 1
 
         pub_msg = String()
         pub_msg.data = str(self.counter_received)
+        self.ctrl_pub.publish(pub_msg)
 
     def run(self, freq):
         rate = rospy.Rate(freq)
