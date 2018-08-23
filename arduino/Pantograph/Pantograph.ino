@@ -44,7 +44,7 @@ static const int servo_pin_right = SERVO_PIN_B;
 static const float goal_tol = 1;      // mm
 static const float rate_loop = 80;
 static const float dt_loop = 1000.0/rate_loop;        // ms
-static const float rate_moving = 150;
+static const float rate_moving = 100;
 static const int imu_reading_nskip = 1;
 
 // global flags to control program behavior
@@ -426,7 +426,6 @@ void loop() {
                 Serial.print((float)event.orientation.y);
                 Serial.print(F(", "));
                 Serial.println((float)event.orientation.z);
-//            Serial.println(F(""));
             }
 
             nskipped = 0;

@@ -22,4 +22,4 @@ def generate_naive_policy(file_name, n_trials, x_range, y_range):
 
 
 if __name__ == "__main__":
-    generate_naive_random_policy("random_protocol.txt", 3, 8, 3)
+    generate_naive_random_policy("random_protocol.txt", 5, 8, 3)
