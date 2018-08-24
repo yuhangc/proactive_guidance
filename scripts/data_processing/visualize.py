@@ -3,27 +3,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-def load_trial(root_path, trial_id, flag_transform=True):
-    data = np.loadtxt(root_path + "/trial" + str(trial_id) + ".txt", delimiter=", ")
-
-    t = data[:, 0]
-    pose = data[:, 1:4]
-
-    # optionally transform the coordinates
-    if flag_transform:
-        offset = np.array([3.0, 3.0])
-        th = -np.pi * 0.75
-
-        rot_mat = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
-        pose[:, 0:2] = np.dot(pose[:, 0:2], rot_mat.transpose()) + offset
-
-    return t, pose
+from loading import load_trial
 
 
 def plot_all(root_path):
     # load protocol
-    protocol_file = "../../resources/protocols/random_protocol.txt"
+    protocol_file = "../../resources/protocols/random_protocol_3rep.txt"
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 
     dirs = protocol_data[:, 0]
@@ -69,4 +54,4 @@ def plot_all(root_path):
 
 
 if __name__ == "__main__":
-    plot_all("/home/yuhang/Documents/proactive_guidance/training_data/test0")
+    plot_all("/home/yuhang/Documents/proactive_guidance/training_data/test0-0820")
