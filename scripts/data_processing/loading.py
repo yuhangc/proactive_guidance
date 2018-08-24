@@ -21,7 +21,7 @@ def load_trial(root_path, trial_id, flag_transform=True, offsets=(3.0, 3.0, -2.3
     return t, pose
 
 
-def load_save_all(root_path, n_trial, offsets=None):
+def load_save_all(root_path, protocol_file, n_trial, offsets=None):
     t_all = []
     pose_all =[]
 
@@ -34,10 +34,14 @@ def load_save_all(root_path, n_trial, offsets=None):
         t_all.append(t)
         pose_all.append(pose)
 
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+
     # save to root path
     with open(root_path + "/raw_transformed.pkl", "w") as f:
-        pickle.dump((t_all, pose_all), f)
+        pickle.dump((t_all, pose_all, protocol_data), f)
 
 
 if __name__ == "__main__":
-    load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/test0-0820", 72, (3.0, 3.0, np.pi * 0.75))
+    load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/test0-0820",
+                  "../../resources/protocols/random_protocol_3rep.txt",
+                  72, (3.0, 3.0, np.pi * 0.75))
