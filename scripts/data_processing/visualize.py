@@ -43,7 +43,7 @@ def plot_all(root_path):
     cm = plt.get_cmap("gist_rainbow")
 
     for mag in range(3):
-        for dir in range(8):
+        for dir in range(7, 8):
             for poses in pose_all[mag][dir]:
                 axes[mag].plot(poses[:, 0], poses[:, 1], color=cm(1. * dir / n_colors))
         axes[mag].axis("equal")

@@ -10,17 +10,13 @@ from loading import wrap_to_pi
 
 
 class ModelBase(object):
-    def __init__(self, dt=0.5, dim=3):
+    def __init__(self, dt=0.5):
         self.X = None
         self.y = None
 
         self.dt = dt
-        self.dim = dim
 
-        self.gp = []
-        for i in range(dim):
-            self.gp.append(gaussian_process.GaussianProcessRegressor(kernel=self.create_kernel(),
-                                                                     n_restarts_optimizer=3))
+        self.gp = gaussian_process.GaussianProcessRegressor(kernel=self.create_kernel())
 
     def create_kernel(self):
         raise IndexError("Method must be implemented!")
@@ -29,32 +25,18 @@ class ModelBase(object):
         raise Exception("Method must be implemented!")
 
     def train(self):
-        for gp, y in zip(self.gp, self.y):
-            gp.fit(self.X, y)
+        self.gp.fit(self.X, self.y)
 
     def predict(self, x):
-        y = []
-        y_std = []
+        return self.gp.predict(x, return_cov=True)
 
-        for gp in self.gp:
-            yi, stdi = gp.predict(x.reshape(1, -1), return_std=True)
-            y.append(yi)
-            y_std.append(stdi)
-
-        return np.asarray(y), np.asarray(y_std)
-
-    def sample(self, x, n=1):
-        y = []
-
-        for gp in self.gp:
-            y.append(gp.sample_y(x.reshape(1, -1), n_samples=n))
-
-        return np.asarray(y)
+    def sample(self, x, n):
+        return self.gp.sample_y(x, n_samples=n)
 
 
 class OneStepModel(ModelBase):
     def __init__(self, dt=0.5):
-        super(OneStepModel, self).__init__(dt, dim=3)
+        super(OneStepModel, self).__init__(dt)
 
     def create_kernel(self):
         return 1.0 * RBF(length_scale=[0.5, 0.5, 0.5, 0.2, 0.2, 0.5, 0.5]) + 1.0 * WhiteKernel(0.2)
@@ -64,9 +46,12 @@ class OneStepModel(ModelBase):
             t_all, pose_all, protocol_data = pickle.load(f)
 
         self.X = []
-        self.y = [[], [], []]
+        self.y = []
 
         for t, pose, comm in zip(t_all, pose_all, protocol_data):
+            if int(comm[0]) != 0:
+                continue
+
             # first down-sample the data
             step = int(self.dt / 0.025)
             t = t[::step]
@@ -93,9 +78,7 @@ class OneStepModel(ModelBase):
                 y = pose[i+1].copy()
 
                 self.X.append(x)
-
-                for dim in range(self.dim):
-                    self.y[dim].append(y[dim])
+                self.y.append(y)
 
     def sample_traj(self, pose_init, comm, T):
         comm[0] *= np.pi * 0.25
@@ -106,13 +89,13 @@ class OneStepModel(ModelBase):
 
         for i in range(T-1):
             # print out information about the prediction
-            # print state.reshape(1, -1)
-            # y, y_cov = self.predict(state)
-            # print "at t = ", i, "mean is: ", y, "cov is:"
-            # print y_cov
+            print state.reshape(1, -1)
+            y, y_cov = self.gp.predict(state.reshape(1, -1), return_cov=True)
+            print "at t = ", i, "mean is: ", y, "cov is:"
+            print y_cov
 
-            pose_next = self.sample(state)
-            traj.append(pose_next.reshape(-1))
+            pose_next = self.gp.sample_y(state.reshape(1, -1))[0].reshape(-1)
+            traj.append(pose_next)
 
             state = np.array([pose_next[0], pose_next[1], pose_next[2],
                               np.cos(comm[0]), np.sin(comm[0]), comm[1], i+1])
@@ -142,12 +125,13 @@ def one_step_model_example(model_file, flag_train_model=False):
     pose_init = np.array([0.0, 0.0, 0.0])
     fig, axes = plt.subplots()
 
-    for dir in range(8):
-        traj = simple_model.sample_traj(pose_init, [dir, 2], 10)
+    for dir in range(0, 1):
+        traj = simple_model.sample_traj(pose_init, [dir, 0], 10)
         axes.plot(traj[:, 0], traj[:, 1])
 
     plt.show()
 
 
 if __name__ == "__main__":
-    one_step_model_example("/home/yuhang/Documents/proactive_guidance/gp_models/test0-0820/one_step_model.pkl", False)
+    one_step_model_example("/home/yuhang/Documents/proactive_guidance/gp_models/test0-0820/one_step_model_multi.pkl",
+                           True)
