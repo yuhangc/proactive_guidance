@@ -8,7 +8,7 @@ def wrap_to_pi(ang):
     return (ang + np.pi) % (2 * np.pi ) - np.pi
 
 
-def load_trial(root_path, trial_id, flag_transform=True, offsets=(3.0, 3.0, -2.3562)):
+def load_trial(root_path, trial_id, flag_transform=True, offsets=(2.13, 2.74, -2.3562)):
     data = np.loadtxt(root_path + "/trial" + str(trial_id) + ".txt", delimiter=", ")
 
     t = data[:, 0]
@@ -46,6 +46,6 @@ def load_save_all(root_path, protocol_file, n_trial, offsets=None):
 
 
 if __name__ == "__main__":
-    load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/test0-0820",
-                  "../../resources/protocols/random_protocol_3rep.txt",
-                  72, (3.0, 3.0, -np.pi * 0.75))
+    load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/test0-0826",
+                  "../../resources/protocols/random_protocol.txt",
+                  120, (2.13, 2.74, -np.pi * 0.75))

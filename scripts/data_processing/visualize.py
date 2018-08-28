@@ -8,7 +8,7 @@ from loading import load_trial
 
 def plot_all(root_path):
     # load protocol
-    protocol_file = "../../resources/protocols/random_protocol_3rep.txt"
+    protocol_file = "../../resources/protocols/random_protocol.txt"
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 
     dirs = protocol_data[:, 0]
@@ -43,15 +43,15 @@ def plot_all(root_path):
     cm = plt.get_cmap("gist_rainbow")
 
     for mag in range(3):
-        for dir in range(7, 8):
+        for dir in range(0, 8):
             for poses in pose_all[mag][dir]:
                 axes[mag].plot(poses[:, 0], poses[:, 1], color=cm(1. * dir / n_colors))
         axes[mag].axis("equal")
-        axes[mag].set_xlim(-1.5, 3.5)
-        axes[mag].set_ylim(-2.5, 3.0)
+        axes[mag].set_xlim(-2.5, 2.5)
+        axes[mag].set_ylim(-2.5, 2.5)
 
     plt.show()
 
 
 if __name__ == "__main__":
-    plot_all("/home/yuhang/Documents/proactive_guidance/training_data/test0-0820")
+    plot_all("/home/yuhang/Documents/proactive_guidance/training_data/test0-0826")
