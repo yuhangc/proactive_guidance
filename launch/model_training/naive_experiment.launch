@@ -1,5 +1,5 @@
 <launch>
-    <arg name="protocol" default="random" />
+    <arg name="protocol" default="random_continuous" />
     <arg name="exp_id" default="test0" />
 	<arg name="mode" default="manual" />
 
@@ -8,6 +8,6 @@
         <param name="path_saving" value="$(env HOME)/Documents/proactive_guidance/training_data/$(arg exp_id)"/>
 		<param name="mode" value="$(arg mode)" />
 		<param name="t_render" type="double" value="5.0" />
-		<param name="t_pause" type="double" value="6.0" />
+		<param name="t_pause" type="double" value="5.0" />
     </node>
 </launch>

@@ -271,13 +271,13 @@ void adjust_goal(char dir_val) {
         xI = xI + mag * rot_corr;
         break;
     
-    case 'L':                 // Left
+    case 'L':                 // Right
     case 'l':
     case '3':
         yI = yI - mag * rot_corr;
         break;
     
-    case 'J':               // Right
+    case 'J':               // Left
     case 'j':
     case '4':
         yI = yI + mag * rot_corr;

@@ -17,9 +17,26 @@ def generate_naive_random_policy(file_name, n_reps, n_dir, n_mag):
     np.savetxt(file_name, data, fmt="%2d", delimiter=", ")
 
 
+def generate_naive_continuous_random_policy(file_name, n_dir, n_rep, mag):
+    data = []
+
+    angles = np.linspace(0, 350, n_dir)
+
+    for i in range(n_rep):
+        for ang in angles:
+            data.append([ang, mag])
+
+    # repeat and randomly permute data
+    data = np.asarray(data, dtype=int)
+    np.random.shuffle(data)
+
+    np.savetxt(file_name, data, fmt="%d", delimiter=", ")
+
+
 def generate_naive_policy(file_name, n_trials, x_range, y_range):
     pass
 
 
 if __name__ == "__main__":
-    generate_naive_random_policy("random_protocol.txt", 5, 8, 3)
+    # generate_naive_random_policy("random_protocol.txt", 5, 8, 3)
+    generate_naive_continuous_random_policy("random_continuous_protocol.txt", 36, 2, 0)

@@ -11,23 +11,15 @@ from data_recorder import DataLogger
 from utils import getKey
 
 
-class NaiveExperiment:
+class NaiveExperimentBase(object):
     def __init__(self):
         # get protocol
         protocol_file = rospy.get_param("~protocol_file", "protocol.txt")
         self.mode = rospy.get_param("~mode", "manual")      # can be 'manual' or 'auto'
-        self.t_render_inc = rospy.get_param("~t_render_inc", 1)
-        self.t_render_offset = rospy.get_param("~t_render_offset", 5)
-        self.t_pause = rospy.get_param("~t_pause", 3)
 
         self.t_trans = None
         self.dir = None
         self.mag = None
-
-        self.mag_inc = 2.0
-        self.mag_offset = 2.0
-        self.pause_inc = 0.1
-        self.pause_offset = 0.1
 
         self.load_protocol(protocol_file)
 
@@ -49,6 +41,9 @@ class NaiveExperiment:
         self.dir = protocol_data[:, 0]
         self.mag = protocol_data[:, 1]
 
+    def publish_haptic_control(self, ctrl):
+        raise Exception("Method must be implemented!")
+
     def _monitor_key(self):
         while not rospy.is_shutdown():
             key = getKey(0.1)
@@ -59,6 +54,45 @@ class NaiveExperiment:
                 self.flag_end_trial = True
             elif key == '\x03':
                 break
+
+    def _loop(self, trial_start):
+        raise Exception("Method must be implemented!")
+
+    def run(self, trial_start):
+        self.t_start = rospy.get_time()
+
+        if self.mode == "manual":
+            key_thread = threading.Thread(target=self._monitor_key)
+            loop_thread = threading.Thread(target=self._loop, args=[trial_start])
+            key_thread.start()
+            loop_thread.start()
+
+            print "Please press 's' to start a trial, and 'e' to end a trial.\r"
+
+            key_thread.join()
+            loop_thread.join()
+        else:
+            print "Trial will start automatically in 5 seconds\r"
+            self._loop(trial_start)
+
+
+class NaiveExperimentDiscreteCue(NaiveExperimentBase):
+    def __init__(self):
+        super(NaiveExperimentDiscreteCue, self).__init__()
+
+        self.t_render_inc = rospy.get_param("~t_render_inc", 1)
+        self.t_render_offset = rospy.get_param("~t_render_offset", 5)
+        self.t_pause = rospy.get_param("~t_pause", 3)
+
+    def publish_haptic_control(self, ctrl):
+        # publish haptic feedback
+        haptic_msg = String()
+        haptic_msg.data = "{:d}{:d}{:d}".format(int(ctrl[0]),
+                                                int(ctrl[1]),
+                                                int(ctrl[2]))
+        print haptic_msg.data
+
+        self.haptic_msg_pub.publish(haptic_msg)
 
     def _loop(self, trial_start):
         trial = trial_start
@@ -86,10 +120,7 @@ class NaiveExperiment:
                     self.flag_start_trial = False
 
                     # send another feedback to remind user
-                    haptic_msg = String()
-                    haptic_msg.data = "{:d}{:d}{:d}".format(int(self.dir[trial]), 0, 0)
-
-                    self.haptic_msg_pub.publish(haptic_msg)
+                    self.publish_haptic_control([self.dir[trial], 0])
 
                     print "Trial ", trial, " ended\r"
                     trial += 1
@@ -101,13 +132,7 @@ class NaiveExperiment:
                 # check for start trial
                 if self.flag_start_trial:
                     # publish haptic feedback
-                    haptic_msg = String()
-                    haptic_msg.data = "{:d}{:d}{:d}".format(int(self.dir[trial]),
-                                                            int(self.mag[trial]),
-                                                            int(self.mag[trial]))
-                    print haptic_msg.data
-
-                    self.haptic_msg_pub.publish(haptic_msg)
+                    self.publish_haptic_control([self.dir[trial], self.mag[trial]])
 
                     # set flags
                     self.flag_is_saving = True
@@ -123,26 +148,78 @@ class NaiveExperiment:
 
             rate.sleep()
 
-    def run(self, trial_start):
-        self.t_start = rospy.get_time()
 
-        if self.mode == "manual":
-            key_thread = threading.Thread(target=self._monitor_key)
-            loop_thread = threading.Thread(target=self._loop, args=[trial_start])
-            key_thread.start()
-            loop_thread.start()
+class NaiveExperimentContinuousCue(NaiveExperimentBase):
+    def __init__(self):
+        super(NaiveExperimentContinuousCue, self).__init__()
 
-            print "Please press 's' to start a trial, and 'e' to end a trial.\r"
+        self.t_render = rospy.get_param("~t_render", 5)
+        self.t_pause = rospy.get_param("~t_pause", 3)
 
-            key_thread.join()
-            loop_thread.join()
-        else:
-            print "Trial will start automatically in 3 seconds\r"
-            self._loop(trial_start)
+    def publish_haptic_control(self, ctrl):
+        # publish haptic feedback
+        haptic_msg = String()
+        haptic_msg.data = "{:d},{:d}".format(int(ctrl[0]), int(ctrl[1]))
+        print haptic_msg.data
+
+        self.haptic_msg_pub.publish(haptic_msg)
+
+    def _loop(self, trial_start):
+        trial = trial_start
+
+        rate = rospy.Rate(40)
+
+        t_last = rospy.get_time()
+        while not rospy.is_shutdown():
+            # save data if is saving
+            if self.flag_is_saving:
+                self.logger.log(self.t_start)
+
+                # if mode is auto, set flag based on timer
+                if self.mode == "auto" and rospy.get_time() - t_last > self.t_render:
+                    self.flag_end_trial = True
+                    t_last = rospy.get_time()
+
+                # check for end trial
+                if self.flag_end_trial:
+                    self.logger.save_data(file_name="trial{}.txt".format(trial))
+
+                    self.flag_is_saving = False
+                    self.flag_end_trial = False
+                    self.flag_start_trial = False
+
+                    # send another feedback to remind user
+                    # always use backward cue for this
+                    self.publish_haptic_control([270, 0])
+
+                    print "Trial ", trial, " ended\r"
+                    trial += 1
+            else:
+                if self.mode == "auto" and rospy.get_time() - t_last > self.t_pause:
+                    self.flag_start_trial = True
+                    t_last = rospy.get_time()
+
+                # check for start trial
+                if self.flag_start_trial:
+                    # publish haptic feedback
+                    self.publish_haptic_control([self.dir[trial], self.mag[trial]])
+
+                    # set flags
+                    self.flag_is_saving = True
+                    self.flag_start_trial = False
+                    self.flag_end_trial = False
+
+                    # reset logger
+                    self.logger.reset()
+
+                    print "Trial ", trial, " started...\r"
+
+            rate.sleep()
 
 
 if __name__ == "__main__":
     rospy.init_node("naive_experiment")
 
-    exp = NaiveExperiment()
+    # exp = NaiveExperimentDiscreteCue()
+    exp = NaiveExperimentContinuousCue()
     exp.run(0)
