@@ -61,7 +61,7 @@ void SerialManager::run(const double freq)
                 ss >> val;
                 imu_msg.data.push_back(val);
 
-                if (i < 2) {
+                if (i < 4) {
                     ss.ignore(2);
                 }
             }

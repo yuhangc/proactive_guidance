@@ -32,6 +32,8 @@ class NaiveExperimentBase(object):
         self.flag_end_trial = False
         self.flag_is_saving = False
 
+        self.flag_end_program = False
+
         # create publisher
         self.haptic_msg_pub = rospy.Publisher("/haptic_control", String, queue_size=1)
 
@@ -54,6 +56,9 @@ class NaiveExperimentBase(object):
                 self.flag_end_trial = True
             elif key == '\x03':
                 break
+
+        self.flag_end_program = True
+        print "Experiment terminated..."
 
     def _loop(self, trial_start):
         raise Exception("Method must be implemented!")
@@ -155,7 +160,7 @@ class NaiveExperimentContinuousCue(NaiveExperimentBase):
 
         self.t_render = rospy.get_param("~t_render", 5)
         self.t_pause = rospy.get_param("~t_pause", 5)
-        self.n_block = rospy.get_param("~n_block", 3)
+        self.n_block = rospy.get_param("~n_block", 40)
 
     def publish_haptic_control(self, ctrl):
         # publish haptic feedback
@@ -166,13 +171,14 @@ class NaiveExperimentContinuousCue(NaiveExperimentBase):
         self.haptic_msg_pub.publish(haptic_msg)
 
     def _break(self, rate):
-        print "Now in break, please press 's' to start next block..."
+        print "Now in break, please press 's' to start next block...\r"
         while not rospy.is_shutdown():
             if self.flag_start_trial:
                 break
             rate.sleep()
 
         self.flag_start_trial = False
+        print "Break ends, starting trial in ", self.t_pause, "seconds\r"
 
     def _loop(self, trial_start):
         trial = trial_start
@@ -180,18 +186,24 @@ class NaiveExperimentContinuousCue(NaiveExperimentBase):
         rate = rospy.Rate(40)
 
         # first wait for calibration
-        print "Please calibrate the IMU, when ready, press 's'..."
+        print "Please calibrate the IMU, when ready, press 's'...\r"
 
         while not rospy.is_shutdown():
-            print "Calibration values are: ", self.logger.cal_data
+            print "Calibration values are: ", self.logger.cal_data, "\r"
             if self.flag_start_trial:
                 break
             rate.sleep()
 
         self.flag_start_trial = False
 
+        print "Calibration finished...\r"
+        if self.mode == "auto":
+            print "Trial will automatically start in ", self.t_pause, " seconds\r"
+        else:
+            print "Please press 's' to start trial and 'e' to end trial\r"
+
         t_last = rospy.get_time()
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown() and not self.flag_end_program:
             # save data if is saving
             if self.flag_is_saving:
                 self.logger.log(self.t_start)
@@ -222,6 +234,8 @@ class NaiveExperimentContinuousCue(NaiveExperimentBase):
 
                     if trial % self.n_block == 0:
                         self._break(rate)
+
+                    t_last = rospy.get_time()
             else:
                 if self.mode == "auto" and rospy.get_time() - t_last > self.t_pause:
                     self.flag_start_trial = True
@@ -241,8 +255,20 @@ class NaiveExperimentContinuousCue(NaiveExperimentBase):
                     self.logger.reset()
 
                     print "Trial ", trial, " started...\r"
+                    t_last = rospy.get_time()
 
             rate.sleep()
+
+    def run(self, trial_start):
+        self.t_start = rospy.get_time()
+
+        key_thread = threading.Thread(target=self._monitor_key)
+        loop_thread = threading.Thread(target=self._loop, args=[trial_start])
+        key_thread.start()
+        loop_thread.start()
+
+        key_thread.join()
+        loop_thread.join()
 
 
 if __name__ == "__main__":
