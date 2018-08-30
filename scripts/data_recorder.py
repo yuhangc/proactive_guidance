@@ -14,10 +14,12 @@ class DataLogger(object):
 
         self.human_pose = np.zeros((3,))
         self.human_vel = np.zeros((3, ))
+        self.cal_data = np.zeros((4, ))
         self.t_meas = rospy.get_time()
 
         self.human_pose_hist = []
         self.human_vel_hist = []
+        self.cal_hist = []
         self.t_hist = []
 
         # queues to temporarily store data
@@ -83,9 +85,9 @@ class DataLogger(object):
         # filter out outliers
         for people in tracking_msg.people:
             if self.filter_measurement(people.pos):
-                self.t_meas = tracking_msg.header.stamp.to_sec()
-                self.human_pose[0] = people.pos.x
-                self.human_pose[1] = people.pos.y
+                # self.t_meas = tracking_msg.header.stamp.to_sec()
+                # self.human_pose[0] = people.pos.x
+                # self.human_pose[1] = people.pos.y
 
                 # push into queue
                 if self.pos_queue.full():
@@ -94,7 +96,10 @@ class DataLogger(object):
                 break
 
     def people_rot_callback(self, rot_msg):
-        self.human_pose[2] = rot_msg.data[0]
+        # self.human_pose[2] = rot_msg.data[0]
+
+        for i in range(4):
+            self.cal_data[i] = rot_msg.data[i+1]
 
         if self.rot_queue.full():
             self.rot_queue.get()

@@ -154,7 +154,8 @@ class NaiveExperimentContinuousCue(NaiveExperimentBase):
         super(NaiveExperimentContinuousCue, self).__init__()
 
         self.t_render = rospy.get_param("~t_render", 5)
-        self.t_pause = rospy.get_param("~t_pause", 3)
+        self.t_pause = rospy.get_param("~t_pause", 5)
+        self.n_block = rospy.get_param("~n_block", 3)
 
     def publish_haptic_control(self, ctrl):
         # publish haptic feedback
@@ -164,10 +165,30 @@ class NaiveExperimentContinuousCue(NaiveExperimentBase):
 
         self.haptic_msg_pub.publish(haptic_msg)
 
+    def _break(self, rate):
+        print "Now in break, please press 's' to start next block..."
+        while not rospy.is_shutdown():
+            if self.flag_start_trial:
+                break
+            rate.sleep()
+
+        self.flag_start_trial = False
+
     def _loop(self, trial_start):
         trial = trial_start
 
         rate = rospy.Rate(40)
+
+        # first wait for calibration
+        print "Please calibrate the IMU, when ready, press 's'..."
+
+        while not rospy.is_shutdown():
+            print "Calibration values are: ", self.logger.cal_data
+            if self.flag_start_trial:
+                break
+            rate.sleep()
+
+        self.flag_start_trial = False
 
         t_last = rospy.get_time()
         while not rospy.is_shutdown():
@@ -194,6 +215,13 @@ class NaiveExperimentContinuousCue(NaiveExperimentBase):
 
                     print "Trial ", trial, " ended\r"
                     trial += 1
+
+                    # take a break or end experiment if reaching end of the block
+                    if trial >= len(self.dir):
+                        break
+
+                    if trial % self.n_block == 0:
+                        self._break(rate)
             else:
                 if self.mode == "auto" and rospy.get_time() - t_last > self.t_pause:
                     self.flag_start_trial = True

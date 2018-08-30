@@ -312,15 +312,27 @@ void loop() {
         if (nskipped >= imu_reading_nskip) {
             sensors_event_t event;
             bno.getEvent(&event);
+            
+            uint8_t system, gyro, accel, mag;
+            system = gyro = accel = mag = 0;
+            bno.getCalibration(&system, &gyro, &accel, &mag);
 
             if (flag_print_debug) {
                 Serial.print(F("Orientation: "));
             }
             Serial.print((float)event.orientation.x);
-            Serial.print(F(", "));
-            Serial.print((float)event.orientation.y);
-            Serial.print(F(", "));
-            Serial.println((float)event.orientation.z);
+            Serial.print(", ");
+//            Serial.print((float)event.orientation.y);
+//            Serial.print(", ");
+//            Serial.print((float)event.orientation.z);
+//            Serial.print(", ");
+            Serial.print(system, DEC);
+            Serial.print(", ");
+            Serial.print(gyro, DEC);
+            Serial.print(", ");
+            Serial.print(accel, DEC);
+            Serial.print(", ");
+            Serial.println(mag, DEC);
 
             nskipped = 0;
         } else {
