@@ -79,7 +79,7 @@ float mag = 4.0;
 float pause = 0.2;
 
 const float rot_corr = -1;
-const float mag_map[] = {3, 4, 6};
+const float mag_map[] = {3, 4, 5};
 const float pause_map[] = {0.1, 0.2, 0.3};
 
 // a pantograph device pointer

@@ -8,7 +8,7 @@ from people_msgs.msg import PositionMeasurementArray
 import threading
 
 from data_recorder import DataLogger
-from utils import getKey
+from utils import getKey, wrap_to_pi
 
 
 class NaiveExperimentBase(object):
@@ -271,9 +271,104 @@ class NaiveExperimentContinuousCue(NaiveExperimentBase):
         loop_thread.join()
 
 
+class NaiveExperimentContinuousGuide(NaiveExperimentContinuousCue):
+    def __init__(self):
+        super(NaiveExperimentContinuousGuide, self).__init__()
+
+        self.t_render = 4.0
+        self.t_pause = 6.0
+
+        self.t_render_inc = 2.0 / np.pi
+
+    def _loop(self, trial_start):
+        trial = trial_start
+
+        rate = rospy.Rate(40)
+
+        # first wait for calibration
+        print "Please calibrate the IMU, when ready, press 's'...\r"
+
+        while not rospy.is_shutdown():
+            print "Calibration values are: ", self.logger.cal_data, "\r"
+            if self.flag_start_trial:
+                break
+            rate.sleep()
+
+        self.flag_start_trial = False
+
+        print "Calibration finished...\r"
+        if self.mode == "auto":
+            print "Trial will automatically start in ", self.t_pause, " seconds\r"
+        else:
+            print "Please press 's' to start trial and 'e' to end trial\r"
+
+        t_last = rospy.get_time()
+        t_render = self.t_render
+        while not rospy.is_shutdown() and not self.flag_end_program:
+            # save data if is saving
+            if self.flag_is_saving:
+                self.logger.log(self.t_start)
+
+                # if mode is auto, set flag based on timer
+                if self.mode == "auto" and rospy.get_time() - t_last > t_render:
+                    self.flag_end_trial = True
+                    t_last = rospy.get_time()
+
+                # check for end trial
+                if self.flag_end_trial:
+                    self.logger.save_data(file_name="trial{}.txt".format(trial))
+
+                    self.flag_is_saving = False
+                    self.flag_end_trial = False
+                    self.flag_start_trial = False
+
+                    # send another feedback to remind user
+                    # always use backward cue for this
+                    self.publish_haptic_control([270, 0])
+
+                    print "Trial ", trial, " ended\r"
+                    trial += 1
+
+                    # take a break or end experiment if reaching end of the block
+                    if trial >= len(self.dir):
+                        break
+
+                    if trial % self.n_block == 0:
+                        self._break(rate)
+
+                    t_last = rospy.get_time()
+            else:
+                if self.mode == "auto" and rospy.get_time() - t_last > self.t_pause:
+                    self.flag_start_trial = True
+                    t_last = rospy.get_time()
+
+                # check for start trial
+                if self.flag_start_trial:
+                    # publish haptic feedback
+                    self.publish_haptic_control([self.dir[trial], self.mag[trial]])
+
+                    # set flags
+                    self.flag_is_saving = True
+                    self.flag_start_trial = False
+                    self.flag_end_trial = False
+
+                    # reset logger
+                    self.logger.reset()
+
+                    # compute new render time
+                    t_render = self.t_render + \
+                               np.abs(wrap_to_pi(np.deg2rad(self.dir[trial]) - np.pi * 0.5)) * self.t_render_inc
+
+                    print "Trial ", trial, " started, t_render is ", t_render, "...\r"
+                    t_last = rospy.get_time()
+
+            rate.sleep()
+
+
 if __name__ == "__main__":
     rospy.init_node("naive_experiment")
 
     # exp = NaiveExperimentDiscreteCue()
-    exp = NaiveExperimentContinuousCue()
+    # exp = NaiveExperimentContinuousCue()
+    exp = NaiveExperimentContinuousGuide()
     exp.run(0)

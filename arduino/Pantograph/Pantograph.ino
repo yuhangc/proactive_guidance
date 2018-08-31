@@ -86,7 +86,7 @@ float pause = 0.2;
 
 const float rot_corr = -1;
 const char dir_char_map[] = {'i', 'o', 'l', '.', ',', 'm', 'j', 'u'};
-const float mag_map[] = {2, 4, 6};
+const float mag_map[] = {2, 4, 5};
 const float pause_map[] = {0.1, 0.2, 0.3};
 
 // a pantograph device pointer
