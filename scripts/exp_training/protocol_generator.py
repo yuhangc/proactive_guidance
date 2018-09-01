@@ -39,4 +39,4 @@ def generate_naive_policy(file_name, n_trials, x_range, y_range):
 
 if __name__ == "__main__":
     # generate_naive_random_policy("random_protocol.txt", 5, 8, 3)
-    generate_naive_continuous_random_policy("random_continuous_protocol_1rep0.txt", 24, 1, 0)
+    generate_naive_continuous_random_policy("random_continuous_protocol_10rep2.txt", 24, 10, 2)
