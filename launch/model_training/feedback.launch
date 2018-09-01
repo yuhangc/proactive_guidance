@@ -1,0 +1,15 @@
+<launch>
+    <arg name="use_haptic" default="true" />
+    <arg name="port" default="/dev/ttyACM0" />
+
+    <node name="serial_manager" pkg="proactive_guidance" type="serial_manager" output="screen">
+        <param name="device_port" value="$(arg port)"/>
+        <remap from="haptic_control" to="audio_feedback" unless="$(arg use_haptic)"/>
+    </node>
+
+    <group unless="$(arg use_haptic)">
+        <node name="audio_feedback" pkg="proactive_guidance" type="audio_feedback.py" output="screen">
+            <remap from="audio_feedback" to="haptic_control"/>
+        </node>
+    </group>
+</launch>
