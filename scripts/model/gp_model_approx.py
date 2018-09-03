@@ -9,7 +9,9 @@ from sklearn.gaussian_process.kernels import RBF, ExpSineSquared, WhiteKernel, C
 
 
 # utility function for outlier rejection
-def outlier_rejection(x, m=2):
+def outlier_rejection(x, m=1.5):
+    a = np.mean(x)
+    b = np.std(x)
     return x[np.abs(x - np.mean(x)) < m * np.std(x)]
 
 
@@ -81,7 +83,7 @@ class GPModelApproxBase(object):
             self.gp_std[i].fit(self.X.reshape(-1, 1), self.y_std[i])
 
     @staticmethod
-    def _visualize_gp(gp, ax, x_train, y_train):
+    def _visualize_gp(gp, ax, x_train, y_train, xlabel, ylabel):
         n_samples = 50
         x = np.linspace(-np.pi, np.pi, n_samples)
 
@@ -96,7 +98,10 @@ class GPModelApproxBase(object):
 
         ax.scatter(x_train, y_train, c='r', s=10, zorder=10, edgecolors=(0, 0, 0))
 
-    def _visualize_process(self, dim, ax):
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+
+    def _visualize_process(self, dim, ax, xlabel, ylabel):
         n_samples = 50
         x = np.linspace(-np.pi, np.pi, n_samples)
 
@@ -109,23 +114,33 @@ class GPModelApproxBase(object):
 
         ax.scatter(self.data[:, 0], self.data[:, dim+1], c='r', s=10, zorder=10, edgecolors=(0, 0, 0))
 
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+
     def visualize_model(self):
         # visualize each individual gp
         fig, axes = plt.subplots(2, self.dim, figsize=(5*self.dim, 5))
 
         if self.dim > 1:
             for i in range(self.dim):
-                self._visualize_gp(self.gp_mean[i], axes[0, i], self.X, self.y_mean[i])
-                self._visualize_gp(self.gp_std[i], axes[1, i], self.X, self.y_std[i])
+                self._visualize_gp(self.gp_mean[i], axes[0, i], self.X, self.y_mean[i],
+                                   "feedback(rad)", "response mean(rad)")
+                self._visualize_gp(self.gp_std[i], axes[1, i], self.X, self.y_std[i],
+                                   "feedback(rad)", "response std(rad)")
         else:
-            self._visualize_gp(self.gp_mean[0], axes[0], self.X, self.y_mean[0])
-            self._visualize_gp(self.gp_std[0], axes[1], self.X, self.y_std[0])
+            self._visualize_gp(self.gp_mean[0], axes[0], self.X, self.y_mean[0],
+                               "feedback(rad)", "response mean(rad)")
+            self._visualize_gp(self.gp_std[0], axes[1], self.X, self.y_std[0],
+                               "feedback(rad)", "response std(rad)")
 
         # visualize each dimension of the model
-        fig, axes = plt.subplots(2, 1, figsize=(5, 5))
+        fig, axes = plt.subplots(self.dim, 1, figsize=(5, 5))
 
-        for i in range(self.dim):
-            self._visualize_process(i, axes[i])
+        if self.dim > 1:
+            for i in range(self.dim):
+                self._visualize_process(i, axes[i], "feedback(rad)", "response data(rad)")
+        else:
+            self._visualize_process(0, axes, "feedback(rad)", "response data(rad)")
 
         plt.show()
 
@@ -148,24 +163,27 @@ def model_approx_one_step_example(root_path, flag_train_model=True):
             pickle.dump(model_one_step, f)
 
 
-def model_approx_continuous_example(root_path, flag_train_model=True):
+def model_approx_continuous_example(root_path, modality, flag_train_model=True):
     if flag_train_model:
         # train a one step model
         model_continuous = GPModelApproxBase(dim=1)
 
-        model_continuous.load_data(root_path + "/continuous")
+        model_continuous.load_data(root_path + "/" + modality)
         model_continuous.train()
     else:
-        with open(root_path + "/continuous_model.pkl") as f:
+        with open(root_path + "/" + modality + "_model.pkl") as f:
             model_continuous = pickle.load(f)
 
     model_continuous.visualize_model()
 
     if flag_train_model:
-        with open(root_path + "/continuous_model.pkl", "w") as f:
+        with open(root_path + "/" + modality + "_model.pkl", "w") as f:
             pickle.dump(model_continuous, f)
 
 
 if __name__ == "__main__":
-    model_approx_one_step_example("/home/yuhang/Documents/proactive_guidance/training_data/user0", False)
-    # model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user0", False)
+    # model_approx_one_step_example("/home/yuhang/Documents/proactive_guidance/training_data/user0", False)
+    model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user0",
+                                    "continuous", False)
+    model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user0",
+                                    "audio", False)

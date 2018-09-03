@@ -76,6 +76,10 @@ def load_save_all(root_path, protocol_file, n_trial, offsets=None, flag_transfor
 
 
 if __name__ == "__main__":
-    load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/test1-0830",
-                  "../../resources/protocols/random_continuous_protocol_10rep2.txt",
-                  120, (2.13, 2.74, -np.pi * 0.75, -np.pi * 0.5))
+    # load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/test1-0830",
+    #               "../../resources/protocols/random_continuous_protocol_10rep2.txt",
+    #               120, (2.13, 2.74, -np.pi * 0.75, -np.pi * 0.5))
+
+    load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/user0/audio",
+                  "../../resources/protocols/random_continuous_protocol_5rep2.txt",
+                  120, (2.13, 3.0, -np.pi * 0.75, np.pi))

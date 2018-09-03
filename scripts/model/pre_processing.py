@@ -57,5 +57,6 @@ def pre_processing(root_path, usr, cond, flag_visualize=True):
 
 
 if __name__ == "__main__":
-    pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "one_step")
-    pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "continuous")
+    # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "one_step")
+    # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "continuous")
+    pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "audio")
