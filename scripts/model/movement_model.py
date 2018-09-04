@@ -4,6 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
+from pre_processing import wrap_to_pi
+from gp_model_approx import GPModelApproxBase
+
 
 class MovementModelParam(object):
     def __init__(self):
@@ -18,13 +21,12 @@ class MovementModelParam(object):
         self.std_delay = 0.0
         self.std_om = 0.0
         self.std_vd = 0.0
+        self.std_vd_heading = 0.0
 
 
 class MovementModel(object):
     def __init__(self, modalities=None):
-        self.x = 0.0
-        self.y = 0.0
-        self.alpha = 0.0
+        self.s = np.zeros((3, ))
 
         # gp models
         self.gp_model = {}
@@ -48,6 +50,26 @@ class MovementModel(object):
                 with open(model_file) as f:
                     self.params[modality] = pickle.load(f)
 
+    def set_default_param(self):
+        self.params["haptic"] = MovementModelParam()
+        self.params["audio"] = MovementModelParam()
+
+        self.params["haptic"].delay = np.log(1.0)
+        self.params["haptic"].om = 3.0
+        self.params["haptic"].vd = 0.6
+        self.params["haptic"].std_delay = 0.3
+        self.params["haptic"].std_om = 0.3
+        self.params["haptic"].std_vd = 0.1
+        self.params["haptic"].std_vd_heading = 0.1
+
+        self.params["audio"].delay = np.log(2.0)
+        self.params["audio"].om = 3.0
+        self.params["audio"].vd = 0.6
+        self.params["audio"].std_delay = 0.3
+        self.params["audio"].std_om = 0.3
+        self.params["audio"].std_vd = 0.1
+        self.params["audio"].std_vd_heading = 0.1
+
     def train(self, data_path):
         # fit parameters with data
         pass
@@ -58,24 +80,151 @@ class MovementModel(object):
             with open(model_file, "w") as f:
                 pickle.dump(self.params[modality], f)
 
-    def sample_state(self, a, t):
-        pass
+    def set_state(self, x, y, alpha):
+        self.s = np.array([x, y, alpha])
 
-    def sample_traj(self, a, T):
+    def sample_traj_single_action(self, a, dt, T):
+        """
+        Simulate the trajectory given a single communication action
+        :param a: action in the form of (modality, alpha_d)
+        :param dt: desired sample time interval
+        :param T: simulate until T
+        :return: a list of time stamps and states
+        """
+        t_traj = [0.0]
+        traj = [self.s.copy()]
+
+        # check for stop
+        if np.abs(a[1]) > np.pi:
+            t_traj.append(T)
+            traj.append(self.s.copy())
+            return t_traj, traj
+
+        # first sample the delay
+        t = self.sample_delay(a)
+
+        if t >= T:
+            t_traj.append(T)
+            traj.append(self.s.copy())
+            return t_traj, traj
+        else:
+            t_traj.append(t)
+            traj.append(self.s.copy())
+
+        # sample the "true" direction that human follows
+        ad_mean, ad_std = self.gp_model[a[0]].predict(a[1])[0]
+        alpha_d = np.random.normal(ad_mean, ad_std)
+
+        # sample turning procedure
+        s_next, dt_turn = self.sample_turning(self.s, (a[0], alpha_d), T - t)
+
+        t += dt_turn
+        t_traj.append(t)
+        traj.append(s_next)
+
+        if t >= T:
+            return t_traj, traj
+
+        # sample straight walking motion
+        s_new = s_next
+        while t + dt < T:
+            s_new = self.sample_walking(s_new, (a[0], alpha_d), dt)
+            t += dt
+
+            t_traj.append(t)
+            traj.append(s_new)
+
+        s_new = self.sample_walking(s_new, (a[0], alpha_d), T - t)
+        t_traj.append(T)
+        traj.append(s_new)
+
+        return t_traj, traj
+
+    def sample_traj_action_list(self, a_list, dt, T):
         pass
 
     # functions to sample/simulate each individual step
     def sample_delay(self, a):
         modality = a[0]
         delay_param = (self.params[modality].delay, self.params[modality].std_delay)
-        return np.exp(np.random.normal(delay_param[0], delay_param[1], 1))
+        return np.exp(np.random.normal(delay_param[0], delay_param[1]))
 
     def sample_turning(self, s, a, dt=None):
-        pass
+        # sample an angular velocity
+        modality, alpha_d = a
+        om_param = (self.params[modality].om, self.params[modality].std_om)
+        om = np.random.normal(om_param[0], om_param[1])
+
+        s_new = s.copy()
+        dt_stop = np.abs(alpha_d - s[2]) / om
+
+        if dt is None:
+            s_new[2] = alpha_d
+            return s_new, dt_stop
+        else:
+            if dt_stop >= dt:
+                if alpha_d > s[2]:
+                    s_new[2] += om * dt
+                else:
+                    s_new[2] -= om * dt
+                dt_stop = dt
+            else:
+                s_new[2] = alpha_d
+
+        return s_new, dt_stop
 
     def sample_walking(self, s, a, dt):
-        pass
+        # assume constant (but noisy) velocity and heading
+        # dt should not be set too large
+        modality, alpha_d = a
+        v_param = (self.params[modality].vd, self.params[modality].std_vd)
+        heading_param = (alpha_d, self.params[modality].std_vd_heading)
+
+        v = np.random.normal(v_param[0], v_param[1])
+        heading = np.random.normal(heading_param[0], heading_param[1])
+
+        s_new = s.copy()
+        s_new[0] += v * np.cos(heading) * dt
+        s_new[1] += v * np.sin(heading) * dt
+        s_new[2] = heading
+
+        return s_new
+
+
+def single_action_sample_example(n_samples, modality):
+    # create a model object
+    model = MovementModel()
+    model.load_model("/home/yuhang/Documents/proactive_guidance/training_data/user0")
+    model.set_default_param()
+
+    # sample with a few actions
+    T = 8.0
+    n_dir = 8
+    alphas = wrap_to_pi(np.pi * 2.0 / n_dir * np.arange(0, n_dir))
+
+    all_traj = []
+    for i in range(n_dir):
+        traj_dir = []
+        for rep in range(n_samples):
+            traj_dir.append(model.sample_traj_single_action((modality, alphas[i]), 0.5, T))
+
+        all_traj.append(traj_dir)
+
+    fig, axes = plt.subplots(2, 4, figsize=(15, 7))
+    for i in range(2):
+        for j in range(4):
+            for t, traj in all_traj[i*4+j]:
+                axes[i][j].plot(t, np.asarray(traj)[:, 2])
+
+    fig, axes = plt.subplots(2, 4, figsize=(15, 7))
+    for i in range(2):
+        for j in range(4):
+            for t, traj in all_traj[i*4+j]:
+                d = np.linalg.norm(np.asarray(traj)[:, :2], axis=1)
+                axes[i][j].plot(t, d)
+
+    plt.show()
 
 
 if __name__ == "__main__":
-    pass
+    single_action_sample_example(5, "haptic")

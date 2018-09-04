@@ -81,6 +81,15 @@ class GPModelApproxBase(object):
             self.gp_mean[i].fit(self.X.reshape(-1, 1), self.y_mean[i])
             self.gp_std[i].fit(self.X.reshape(-1, 1), self.y_std[i])
 
+    def predict(self, dir_in):
+        x = np.array([dir_in]).reshape(-1, 1)
+        y = []
+
+        for i in range(self.dim):
+            y.append((self.gp_mean[i].predict(x), self.gp_std[i].predict(x)))
+
+        return y
+
     @staticmethod
     def _visualize_gp(gp, ax, x_train, y_train, xlabel, ylabel):
         n_samples = 50
