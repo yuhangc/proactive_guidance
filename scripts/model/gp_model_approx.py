@@ -10,8 +10,6 @@ from sklearn.gaussian_process.kernels import RBF, ExpSineSquared, WhiteKernel, C
 
 # utility function for outlier rejection
 def outlier_rejection(x, m=1.5):
-    a = np.mean(x)
-    b = np.std(x)
     return x[np.abs(x - np.mean(x)) < m * np.std(x)]
 
 
@@ -44,7 +42,8 @@ class GPModelApproxBase(object):
             kernel_std = 1.0 * ExpSineSquared(length_scale=1.0, periodicity=3.0,
                                               length_scale_bounds=(0.5, 5.0),
                                               periodicity_bounds=(1.0, 10.0)) + \
-                         ConstantKernel(0.1, constant_value_bounds=(0.05, 0.2)) * WhiteKernel(0.01, noise_level_bounds=(0.01, 0.1))
+                         ConstantKernel(0.1, constant_value_bounds=(0.05, 0.2)) * \
+                         WhiteKernel(0.01, noise_level_bounds=(0.01, 0.1))
             gp_std.append(gaussian_process.GaussianProcessRegressor(kernel=kernel_std,
                                                                     n_restarts_optimizer=3))
         return gp_mean, gp_std

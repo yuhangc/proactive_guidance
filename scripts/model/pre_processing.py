@@ -56,7 +56,58 @@ def pre_processing(root_path, usr, cond, flag_visualize=True):
         pickle.dump(np.hstack((dir_in.reshape(-1, 1), dir_out.reshape(-1, 1), mag_out.reshape(-1, 1))), f)
 
 
+def visualize_processes(root_path, usr, cond):
+    # load the preprocessed data
+    path = root_path + "/user" + str(usr) + "/" + cond
+    data_file = path + "/raw_transformed.pkl"
+
+    with open(data_file) as f:
+        t_all, pose_all, protocol_data = pickle.load(f)
+
+    # group data by feedback
+    input_mapping = {}
+    for t, pose, protocol in zip(t_all, pose_all, protocol_data):
+        alpha_d = protocol[0] - 90.0
+        if alpha_d > 180:
+            alpha_d -= 360
+
+        if input_mapping.has_key(alpha_d):
+            input_mapping[alpha_d].append((t, pose))
+        else:
+            input_mapping[alpha_d] = [(t, pose)]
+
+    # create subplots for each input
+    n_dir = 24
+    n_col = 6
+    n_row = 4
+
+    fig1, axes1 = plt.subplots(n_row, n_col, figsize=(20, 12))
+    fig2, axes2 = plt.subplots(n_row, n_col, figsize=(20, 12))
+
+    i = 0
+    j = 0
+    for key in sorted(input_mapping.iterkeys()):
+        for data in input_mapping[key]:
+            t, pose = data
+            t = t - t[0]
+
+            pose[:, 2] = wrap_to_pi(pose[:, 2])
+            axes1[i][j].plot(t, pose[:, 2])
+
+            d = np.linalg.norm(pose[:, :2], axis=1)
+            axes2[i][j].plot(t, d)
+
+        j += 1
+        if j >= n_col:
+            i += 1
+            j = 0
+
+    plt.show()
+
+
 if __name__ == "__main__":
     # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "one_step")
     # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "continuous")
-    pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "audio")
+    # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "audio")
+    visualize_processes("/home/yuhang/Documents/proactive_guidance/training_data", 0, "continuous")
+
