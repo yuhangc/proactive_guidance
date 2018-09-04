@@ -55,7 +55,7 @@ class MovementModel(object):
         self.params["audio"] = MovementModelParam()
 
         self.params["haptic"].delay = np.log(1.0)
-        self.params["haptic"].om = 3.0
+        self.params["haptic"].om = 2.0
         self.params["haptic"].vd = 0.6
         self.params["haptic"].std_delay = 0.3
         self.params["haptic"].std_om = 0.3
@@ -63,7 +63,7 @@ class MovementModel(object):
         self.params["haptic"].std_vd_heading = 0.1
 
         self.params["audio"].delay = np.log(2.0)
-        self.params["audio"].om = 3.0
+        self.params["audio"].om = 2.0
         self.params["audio"].vd = 0.6
         self.params["audio"].std_delay = 0.3
         self.params["audio"].std_om = 0.3
@@ -98,7 +98,7 @@ class MovementModel(object):
         if np.abs(a[1]) > np.pi:
             t_traj.append(T)
             traj.append(self.s.copy())
-            return t_traj, traj
+            return np.asarray(t_traj), np.asarray(traj)
 
         # first sample the delay
         t = self.sample_delay(a)
@@ -106,14 +106,14 @@ class MovementModel(object):
         if t >= T:
             t_traj.append(T)
             traj.append(self.s.copy())
-            return t_traj, traj
+            return np.asarray(t_traj), np.asarray(traj)
         else:
             t_traj.append(t)
             traj.append(self.s.copy())
 
         # sample the "true" direction that human follows
         ad_mean, ad_std = self.gp_model[a[0]].predict(a[1])[0]
-        alpha_d = np.random.normal(ad_mean, ad_std)
+        alpha_d = np.random.normal(ad_mean, ad_std) + self.s[2]
 
         # sample turning procedure
         s_next, dt_turn = self.sample_turning(self.s, (a[0], alpha_d), T - t)
@@ -123,7 +123,7 @@ class MovementModel(object):
         traj.append(s_next)
 
         if t >= T:
-            return t_traj, traj
+            return np.asarray(t_traj), np.asarray(traj)
 
         # sample straight walking motion
         s_new = s_next
@@ -138,7 +138,7 @@ class MovementModel(object):
         t_traj.append(T)
         traj.append(s_new)
 
-        return t_traj, traj
+        return np.asarray(t_traj), np.asarray(traj)
 
     def sample_traj_action_list(self, a_list, dt, T):
         pass
@@ -198,7 +198,7 @@ def single_action_sample_example(n_samples, modality):
     model.set_default_param()
 
     # sample with a few actions
-    T = 8.0
+    T = 6.0
     n_dir = 8
     alphas = wrap_to_pi(np.pi * 2.0 / n_dir * np.arange(0, n_dir))
 
@@ -227,4 +227,4 @@ def single_action_sample_example(n_samples, modality):
 
 
 if __name__ == "__main__":
-    single_action_sample_example(5, "haptic")
+    single_action_sample_example(5, "audio")
