@@ -83,6 +83,10 @@ class MovementModel(object):
     def set_state(self, x, y, alpha):
         self.s = np.array([x, y, alpha])
 
+    def sample_state(self, a, dt, T):
+        t, traj = self.sample_traj_single_action(a, dt, T)
+        return traj[-1]
+
     def sample_traj_single_action(self, a, dt, T):
         """
         Simulate the trajectory given a single communication action

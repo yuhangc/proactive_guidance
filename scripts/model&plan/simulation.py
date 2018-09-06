@@ -5,11 +5,11 @@ import matplotlib.pyplot as plt
 
 from gp_model_approx import GPModelApproxBase
 from movement_model import MovementModel
-from policies import NaivePolicy
+from policies import NaivePolicy, MDPFixedTimePolicy
 
 
 class Simulator(object):
-    def __init__(self):
+    def __init__(self, settings):
         # use a simple model first
         self.human_model = MovementModel()
 
@@ -18,7 +18,10 @@ class Simulator(object):
         self.human_model.set_default_param()
 
         # use a naive planner
-        self.planner = NaivePolicy()
+        if settings["Planner"] == "Naive":
+            self.planner = NaivePolicy()
+        elif settings["Planner"] == "MDPFixedTime":
+            self.planner = MDPFixedTimePolicy(self.human_model)
 
         self.dt = 0.5
         self.dt_comm = 0.0
@@ -30,6 +33,9 @@ class Simulator(object):
             self.dt_comm = 2.0
         else:
             self.dt_comm = 3.0
+
+        # compute policy once
+        self.planner.compute_policy(s_g, modality)
 
         t = 0.0
         t_list = ()
@@ -46,8 +52,7 @@ class Simulator(object):
                 break
 
             # compute feedback using planner
-            self.planner.set_target(s_g)
-            alpha_d = self.planner.compute_policy(self.human_model.s)
+            alpha_d = self.planner.sample_policy(self.human_model.s)
 
             # sample human response giving feedback
             t_traj, traj = self.human_model.sample_traj_single_action((modality, alpha_d), self.dt, self.dt_comm)
@@ -63,8 +68,9 @@ class Simulator(object):
         return np.hstack(t_list), np.vstack(traj_list)
 
 
-def simulate_naive_policy(n_trials, s_g, modality):
-    sim = Simulator()
+def simulate_naive_policy(n_trials, s_g, modality, planner):
+    settings = {"Planner": planner}
+    sim = Simulator(settings)
 
     traj_list = []
     for i in range(n_trials):
@@ -82,4 +88,5 @@ def simulate_naive_policy(n_trials, s_g, modality):
 
 
 if __name__ == "__main__":
-    simulate_naive_policy(20, np.array([5.0, 2.0, 0.0]), "haptic")
+    # simulate_naive_policy(30, np.array([5.0, 2.0, 0.0]), "haptic", "Naive")
+    simulate_naive_policy(30, np.array([5.0, 2.0, 0.0]), "haptic", "MDPFixedTime")
