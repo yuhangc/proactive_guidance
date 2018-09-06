@@ -5,11 +5,10 @@ import matplotlib.pyplot as plt
 
 from gp_model_approx import GPModelApproxBase
 from movement_model import MovementModel
-from policies import NaivePolicy, MDPFixedTimePolicy
 
 
 class Simulator(object):
-    def __init__(self, settings):
+    def __init__(self, planner):
         # use a simple model first
         self.human_model = MovementModel()
 
@@ -17,11 +16,7 @@ class Simulator(object):
         self.human_model.load_model("/home/yuhang/Documents/proactive_guidance/training_data/user0")
         self.human_model.set_default_param()
 
-        # use a naive planner
-        if settings["Planner"] == "Naive":
-            self.planner = NaivePolicy()
-        elif settings["Planner"] == "MDPFixedTime":
-            self.planner = MDPFixedTimePolicy(self.human_model)
+        self.planner = planner
 
         self.dt = 0.5
         self.dt_comm = 0.0
@@ -68,25 +63,5 @@ class Simulator(object):
         return np.hstack(t_list), np.vstack(traj_list)
 
 
-def simulate_naive_policy(n_trials, s_g, modality, planner):
-    settings = {"Planner": planner}
-    sim = Simulator(settings)
-
-    traj_list = []
-    for i in range(n_trials):
-        traj_list.append(sim.run_trial((0.0, 0.0, 0.0), s_g, modality, 30.0, tol=0.5))
-
-    fig, axes = plt.subplots()
-    for i in range(n_trials):
-        t, traj = traj_list[i]
-        axes.plot(traj[:, 0], traj[:, 1])
-    axes.axis("equal")
-
-    axes.scatter(s_g[0], s_g[1])
-
-    plt.show()
-
-
 if __name__ == "__main__":
-    # simulate_naive_policy(30, np.array([5.0, 2.0, 0.0]), "haptic", "Naive")
-    simulate_naive_policy(30, np.array([5.0, 2.0, 0.0]), "haptic", "MDPFixedTime")
+    pass
