@@ -85,6 +85,7 @@ class MovementModel(object):
 
     def sample_state(self, a, dt, T):
         t, traj = self.sample_traj_single_action(a, dt, T)
+        traj[-1, 2] = wrap_to_pi(traj[-1, 2])
         return traj[-1]
 
     def sample_traj_single_action(self, a, dt, T):
