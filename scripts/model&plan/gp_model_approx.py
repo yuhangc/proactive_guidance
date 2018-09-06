@@ -27,6 +27,13 @@ class GPModelApproxBase(object):
         # gaussian process objects
         self.gp_mean, self.gp_std = self.create_gp()
 
+        # samples used for fast interpolation
+        self.gp_x = None
+        self.gp_mean_f = None
+        self.gp_std_f = None
+
+        self.n_samples_fast_prediction = 24
+
     def create_gp(self):
         gp_mean = []
         gp_std = []
@@ -47,6 +54,15 @@ class GPModelApproxBase(object):
             gp_std.append(gaussian_process.GaussianProcessRegressor(kernel=kernel_std,
                                                                     n_restarts_optimizer=3))
         return gp_mean, gp_std
+
+    def create_gp_interp_func(self, n_samples):
+        self.gp_x = np.arange(0, n_samples) * 2.0 * np.pi / n_samples - np.pi
+        self.gp_mean_f = []
+        self.gp_std_f = []
+
+        for i in range(self.dim):
+            self.gp_mean_f.append(self.gp_mean[i].predict(self.gp_x.reshape(-1, 1)).reshape(-1))
+            self.gp_std_f.append(self.gp_std[i].predict(self.gp_x.reshape(-1, 1)).reshape(-1))
 
     def load_data(self, root_path, flag_outlier_rejection=True):
         with open(root_path + "/processed.pkl") as f:
@@ -87,6 +103,14 @@ class GPModelApproxBase(object):
 
         for i in range(self.dim):
             y.append((self.gp_mean[i].predict(x), self.gp_std[i].predict(x)))
+
+        return y
+
+    def predict_fast(self, dir_in):
+        y = []
+        for i in range(self.dim):
+            y.append((np.interp(dir_in, self.gp_x, self.gp_mean_f[i]),
+                      np.interp(dir_in, self.gp_x, self.gp_std_f[i])))
 
         return y
 
@@ -189,9 +213,27 @@ def model_approx_continuous_example(root_path, modality, flag_train_model=True):
             pickle.dump(model_continuous, f)
 
 
+def model_approx_create_interp_data(root_path):
+    with open(root_path + "/gp_model_haptic.pkl") as f:
+        model_haptic = pickle.load(f)
+
+    with open(root_path + "/gp_model_audio.pkl") as f:
+        model_audio = pickle.load(f)
+
+    model_haptic.create_gp_interp_func(24)
+    model_audio.create_gp_interp_func(24)
+
+    with open(root_path + "/gp_model_haptic.pkl", "w") as f:
+        pickle.dump(model_haptic, f)
+
+    with open(root_path + "/gp_model_audio.pkl", "w") as f:
+        pickle.dump(model_audio, f)
+
+
 if __name__ == "__main__":
     # model_approx_one_step_example("/home/yuhang/Documents/proactive_guidance/training_data/user0", False)
-    model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user0",
-                                    "continuous", False)
-    model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user0",
-                                    "audio", False)
+    # model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user0",
+    #                                 "continuous", False)
+    # model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user0",
+    #                                 "audio", False)
+    model_approx_create_interp_data("/home/yuhang/Documents/proactive_guidance/training_data/user0")

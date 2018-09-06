@@ -116,7 +116,8 @@ class MovementModel(object):
             traj.append(self.s.copy())
 
         # sample the "true" direction that human follows
-        ad_mean, ad_std = self.gp_model[a[0]].predict(a[1])[0]
+        # ad_mean, ad_std = self.gp_model[a[0]].predict(a[1])[0]
+        ad_mean, ad_std = self.gp_model[a[0]].predict_fast(a[1])[0]
         alpha_d = np.random.normal(ad_mean, ad_std) + self.s[2]
 
         # sample turning procedure
