@@ -2,6 +2,8 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+
 import pickle
 from collections import deque
 
@@ -51,6 +53,10 @@ class MDPFixedTimePolicy(object):
         self.nA = 11
         self.a_list = np.arange(0, self.nA) * (np.pi / self.nA) - np.pi
 
+        self.a_range_init = 2.0 * np.pi
+        self.a_range_final = np.pi / 3.0
+        self.a_dec_iter = 20
+
         # value function, Q function, policy, rewards
         self.V = -1000.0 * np.ones((self.nX, self.nY, self.nAlp))
         self.Q = np.zeros((self.nX, self.nY, self.nAlp, self.nA))
@@ -62,7 +68,7 @@ class MDPFixedTimePolicy(object):
         self.r_obs = -20.0
 
         # discount factor
-        self.gamma = 0.95
+        self.gamma = 0.9
 
         # policy update counting threshold
         self.n_update_th = 3
@@ -152,7 +158,23 @@ class MDPFixedTimePolicy(object):
 
     def load_env(self, file_path):
         # load possible obstacles
-        pass
+        with open(file_path + "/planner_env.pkl") as f:
+            self.obs = pickle.load(f)
+
+    def gen_env(self, obs_list, file_path=None):
+        # obs_list is a list of rectangular obstacles in the form (x, y, w, h)
+        for x, y, w, h in obs_list:
+            for i in range(int(w / self.dx)):
+                for j in range(int(h / self.dy)):
+                    xi = x + i * self.dx
+                    yj = y + j * self.dy
+
+                    xg, yg, tmp = self.xy_to_grid(xi, yj, 0.0)
+                    self.obs[xg, yg] = 1.0
+
+        if file_path is not None:
+            with open(file_path + "/planner_env.pkl", "w") as f:
+                pickle.dump(self.obs, f)
 
     def init_value_function(self, s_g):
         # set obstacle values
@@ -229,6 +251,14 @@ class MDPFixedTimePolicy(object):
             # V_curr = self.V
             # self.V = np.zeros((self.nX, self.nY, self.nAlp))
 
+            if i <= self.a_dec_iter:
+                a_range = self.a_range_init - (self.a_range_init - self.a_range_final) / self.a_dec_iter * i
+            else:
+                a_range = self.a_range_final
+
+            da = a_range / self.nA
+            print da
+
             # iterate over all states
             for xg, yg in self.update_q:
                 for alp_g in range(self.nAlp):
@@ -245,8 +275,7 @@ class MDPFixedTimePolicy(object):
                     a_opt = 0.0
 
                     # only sample actions that make sense
-                    da = np.pi / 3.0 / self.nA
-                    a_list = da * np.arange(0, self.nA) - np.pi / 6.0 + self.policy[xg, yg, alp_g]
+                    a_list = da * np.arange(0, self.nA) - a_range / 2.0 + self.policy[xg, yg, alp_g]
 
                     for ai, a in enumerate(a_list):
                         Vnext = 0.0
@@ -320,9 +349,18 @@ def simulate_naive_policy(n_trials, s_g, modality):
     plt.show()
 
 
-def validate_MDP_policy(root_path, flag_plan=True):
-    s_g = np.array([3.0, 2.0, 0.0])
-    modality = "haptic"
+def validate_MDP_policy(root_path, flag_with_obs=True, flag_plan=True):
+    s_g = np.array([4.0, 3.0, 0.0])
+    modality = "audio"
+
+    obs_list = [(1.5, 2.00, 1.0, 1.25),
+                (2.5, 1.0, 1.0, 0.5)]
+
+    if flag_with_obs:
+        file_name = root_path + "/mdp_planenr_obs_" + modality + ".pkl"
+    else:
+        file_name = root_path + "/mdp_planner_" + modality + ".pkl"
+
     if flag_plan:
         human_model = MovementModel()
         human_model.load_model(root_path)
@@ -330,9 +368,12 @@ def validate_MDP_policy(root_path, flag_plan=True):
 
         planner = MDPFixedTimePolicy(tmodel=human_model)
 
-        planner.compute_policy(s_g, modality, max_iter=20)
+        if flag_with_obs:
+            planner.gen_env(obs_list)
+
+        planner.compute_policy(s_g, modality, max_iter=30)
     else:
-        with open(root_path + "/mdp_planner.pkl") as f:
+        with open(file_name) as f:
             planner = pickle.load(f)
 
     fig, axes = plt.subplots()
@@ -340,7 +381,7 @@ def validate_MDP_policy(root_path, flag_plan=True):
     plt.show()
 
     if flag_plan:
-        with open(root_path + "/mdp_planner.pkl", "w") as f:
+        with open(file_name, "w") as f:
             pickle.dump(planner, f)
 
     sim = Simulator(planner)
@@ -348,7 +389,7 @@ def validate_MDP_policy(root_path, flag_plan=True):
 
     traj_list = []
     for i in range(n_trials):
-        traj_list.append(sim.run_trial((0.0, 0.0, 0.0), s_g, modality, 15.0, tol=0.5))
+        traj_list.append(sim.run_trial((0.0, 0.0, 0.0), s_g, modality, 30.0, tol=0.5))
 
     fig, axes = plt.subplots()
     for i in range(n_trials):
@@ -358,9 +399,14 @@ def validate_MDP_policy(root_path, flag_plan=True):
 
     axes.scatter(s_g[0], s_g[1])
 
-    plt.show()
+    if flag_with_obs:
+        for x, y, w, h in obs_list:
+            rect = Rectangle((x, y), w, h)
+            axes.add_patch(rect)
 
+    plt.show()
 
 if __name__ == "__main__":
     # simulate_naive_policy(30, np.array([3.0, 2.0, 0.0]), "haptic")
-    validate_MDP_policy("/home/yuhang/Documents/proactive_guidance/training_data/user0", True)
+    validate_MDP_policy("/home/yuhang/Documents/proactive_guidance/training_data/user0",
+                        flag_with_obs=True, flag_plan=True)
