@@ -65,7 +65,7 @@ class MDPFixedTimePolicy(object):
         self.obs = np.zeros((self.nX, self.nY))
 
         self.r_goal = 10.0
-        self.r_obs = -20.0
+        self.r_obs = -200.0
 
         # discount factor
         self.gamma = 0.9
@@ -262,9 +262,9 @@ class MDPFixedTimePolicy(object):
             # iterate over all states
             for xg, yg in self.update_q:
                 for alp_g in range(self.nAlp):
-                    # don't perform update on obstacle and goal state
-                    if self.obs[xg, yg] > 0:
-                        continue
+                    # don't perform update on goal state
+                    # if self.obs[xg, yg] > 0:
+                    #     continue
                     if xg == xgg and yg == ygg:
                         continue
 
@@ -275,7 +275,7 @@ class MDPFixedTimePolicy(object):
                     a_opt = 0.0
 
                     # only sample actions that make sense
-                    a_list = da * np.arange(0, self.nA) - a_range / 2.0 + self.policy[xg, yg, alp_g]
+                    a_list = wrap_to_pi(da * np.arange(0, self.nA) - a_range / 2.0 + self.policy[xg, yg, alp_g])
 
                     for ai, a in enumerate(a_list):
                         Vnext = 0.0
@@ -299,7 +299,10 @@ class MDPFixedTimePolicy(object):
                             a_opt = a
 
                     # update value function and policy
-                    self.V[xg, yg, alp_g] = Q_max
+                    # only update value for non-obstacle states
+                    if not self.obs[xg, yg]:
+                        self.V[xg, yg, alp_g] = Q_max
+
                     if self.policy[xg, yg, alp_g] != a_opt:
                         self.policy[xg, yg, alp_g] = a_opt
                         flag_policy_update = True
@@ -323,6 +326,11 @@ class MDPFixedTimePolicy(object):
 
     def visualize_policy(self, ax=None):
         Vplot = np.max(self.V, axis=2)
+        for xg in range(self.nX):
+            for yg in range(self.nY):
+                if self.obs[xg, yg]:
+                    Vplot[xg, yg] = -2
+
         if ax is None:
             fig, ax = plt.subplots()
 
@@ -354,7 +362,7 @@ def validate_MDP_policy(root_path, flag_with_obs=True, flag_plan=True):
     modality = "audio"
 
     obs_list = [(1.5, 2.00, 1.0, 1.25),
-                (2.5, 1.0, 1.0, 0.5)]
+                (2.0, 1.0, 1.25, 0.5)]
 
     if flag_with_obs:
         file_name = root_path + "/mdp_planenr_obs_" + modality + ".pkl"
@@ -389,7 +397,7 @@ def validate_MDP_policy(root_path, flag_with_obs=True, flag_plan=True):
 
     traj_list = []
     for i in range(n_trials):
-        traj_list.append(sim.run_trial((0.0, 0.0, 0.0), s_g, modality, 30.0, tol=0.5))
+        traj_list.append(sim.run_trial((1.0, 1.5, 0.0), s_g, modality, 30.0, tol=0.5))
 
     fig, axes = plt.subplots()
     for i in range(n_trials):
@@ -409,4 +417,4 @@ def validate_MDP_policy(root_path, flag_with_obs=True, flag_plan=True):
 if __name__ == "__main__":
     # simulate_naive_policy(30, np.array([3.0, 2.0, 0.0]), "haptic")
     validate_MDP_policy("/home/yuhang/Documents/proactive_guidance/training_data/user0",
-                        flag_with_obs=True, flag_plan=True)
+                        flag_with_obs=True, flag_plan=False)
