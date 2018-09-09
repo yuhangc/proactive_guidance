@@ -8,7 +8,7 @@ import pickle
 from collections import deque
 
 from pre_processing import wrap_to_pi
-from movement_model import MovementModel
+from movement_model import MovementModel, MovementModelParam
 from gp_model_approx import GPModelApproxBase
 from simulation import Simulator
 
@@ -29,22 +29,32 @@ class NaivePolicy(object):
 
 
 class MDPFixedTimePolicy(object):
-    def __init__(self, tmodel):
+    def __init__(self, tmodel, ranges=None):
         # workspace size, resolution, offset
-        self.nX = 20
-        self.nY = 20
         self.nAlp = 12
 
         self.dx = 0.25
         self.dy = 0.25
         self.dalp = 2.0 * np.pi / self.nAlp
 
-        self.x_offset = 0.0
-        self.y_offset = 0.
         self.alp_offset = -np.pi
 
-        self.x_range = [self.x_offset, self.x_offset + self.dx * (self.nX-1)]
-        self.y_range = [self.y_offset, self.y_offset + self.dy * (self.nY-1)]
+        if ranges is None:
+            self.nX = 20
+            self.nY = 20
+
+            self.x_offset = 0.0
+            self.y_offset = 0.0
+
+            self.x_range = [self.x_offset, self.x_offset + self.dx * (self.nX-1)]
+            self.y_range = [self.y_offset, self.y_offset + self.dy * (self.nY-1)]
+        else:
+            self.x_range, self.y_range = ranges
+            self.x_offset = self.x_range[0]
+            self.y_offset = self.y_range[0]
+
+            self.nX = int((self.x_range[1] - self.x_range[0]) / self.dx) + 1
+            self.nY = int((self.y_range[1] - self.y_range[0]) / self.dy) + 1
 
         # fixed time interval
         self.dt = 2.0
@@ -55,7 +65,7 @@ class MDPFixedTimePolicy(object):
 
         self.a_range_init = 2.0 * np.pi
         self.a_range_final = np.pi / 3.0
-        self.a_dec_iter = 20
+        self.a_dec_iter = 10
 
         # value function, Q function, policy, rewards
         self.V = -1000.0 * np.ones((self.nX, self.nY, self.nAlp))
@@ -222,8 +232,8 @@ class MDPFixedTimePolicy(object):
                         x, y, alp = self.grid_to_xy(xg_next, yg_next, alp_g)
                         self.policy[xg_next, yg_next, alp_g] = wrap_to_pi(np.arctan2(-dy[i], -dx[i]) - alp)
 
-        self.visualize_policy()
-        plt.show()
+        # self.visualize_policy()
+        # plt.show()
 
     def compute_policy(self, s_g, modality, max_iter=50):
         if self.flag_policy_computed and self.modality == modality:
@@ -414,7 +424,117 @@ def validate_MDP_policy(root_path, flag_with_obs=True, flag_plan=True):
 
     plt.show()
 
+
+def validate_free_space_policy(planner, s_g, modality, path):
+    fig, axes = plt.subplots()
+    planner.visualize_policy(axes)
+    fig.savefig(path + "/value_func.png")
+
+    sim = Simulator(planner)
+    n_trials = 30
+
+    traj_list = []
+    for i in range(n_trials):
+        traj_list.append(sim.run_trial((-1.0, 2.0, 0.0), s_g, modality, 30.0, tol=0.5))
+
+    fig, axes = plt.subplots()
+    for i in range(n_trials):
+        t, traj = traj_list[i]
+        axes.plot(traj[:, 0], traj[:, 1])
+    axes.axis("equal")
+
+    axes.scatter(s_g[0], s_g[1])
+    fig.savefig(path + "/simulation.png")
+
+
+def generate_naive_policies(protocol_file, save_path, modality):
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+
+    n_targets = int(np.max(protocol_data[:, 0], ) + 1)
+    generated = np.zeros((n_targets, ))
+
+    save_path += "/naive_" + modality + "/free_space"
+    for trial_data in protocol_data:
+        target_id = int(trial_data[0])
+        if generated[target_id] < 1.0:
+            naive_policy = NaivePolicy()
+            naive_policy.compute_policy(np.array([trial_data[2], trial_data[3], 0.0]), modality)
+
+            with open(save_path + "/target" + str(target_id) + ".pkl", "w") as f:
+                pickle.dump(naive_policy, f)
+
+            generated[target_id] = 1.0
+
+
+def generate_mdp_policies(protocol_file, model_path, modality):
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+
+    n_targets = int(np.max(protocol_data[:, 0], ) + 1)
+    generated = np.zeros((n_targets, ))
+    save_path = model_path + "/mdp_" + modality + "/free_space"
+
+    ranges = [[-1.5, 4.0], [-1.0, 5.0]]
+
+    for trial_data in protocol_data:
+        target_id = int(trial_data[0])
+        if generated[target_id] < 1.0:
+            # load human model first
+            with open(model_path + "/human_models/user0_default.pkl") as f:
+                human_model = pickle.load(f)
+
+            # create the planner
+            mdp_policy = MDPFixedTimePolicy(human_model, ranges)
+
+            # compute policy
+            s_g = np.array([trial_data[2], trial_data[3], 0.0])
+            mdp_policy.compute_policy(s_g, modality, max_iter=20)
+
+            with open(save_path + "/target" + str(target_id) + ".pkl", "w") as f:
+                pickle.dump(mdp_policy, f)
+
+            # save some figures for debug
+            fig_path = save_path + "/target" + str(target_id) + "_figs"
+            mkdir_p(fig_path)
+            validate_free_space_policy(mdp_policy, s_g, modality, fig_path)
+
+            generated[target_id] = 1.0
+
+
+def mkdir_p(mypath):
+    """
+    Creates a directory. equivalent to using mkdir -p on the command line
+    """
+
+    from errno import EEXIST
+    from os import makedirs, path
+
+    try:
+        makedirs(mypath)
+    except OSError as exc:
+        # Python >2.5
+        if exc.errno == EEXIST and path.isdir(mypath):
+            pass
+        else:
+            raise
+
+
 if __name__ == "__main__":
     # simulate_naive_policy(30, np.array([3.0, 2.0, 0.0]), "haptic")
-    validate_MDP_policy("/home/yuhang/Documents/proactive_guidance/training_data/user0",
-                        flag_with_obs=True, flag_plan=False)
+    # validate_MDP_policy("/home/yuhang/Documents/proactive_guidance/training_data/user0",
+    #                     flag_with_obs=True, flag_plan=False)
+
+    # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
+    #                         "../../resources/pretrained_models",
+    #                         "haptic")
+    #
+    # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
+    #                         "../../resources/pretrained_models",
+    #                         "audio")
+
+    generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
+                          "../../resources/pretrained_models",
+                          "haptic")
+
+    generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
+                          "../../resources/pretrained_models",
+                          "audio")

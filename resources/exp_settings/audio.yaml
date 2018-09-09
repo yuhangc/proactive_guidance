@@ -1,0 +1,5 @@
+planner_dt: 2.5
+resetting_dt: 10.0
+resuming_dt: 5.0
+
+goal_reaching_th: 0.5

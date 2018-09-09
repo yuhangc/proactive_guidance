@@ -33,12 +33,20 @@ class DataLogger(object):
         self.human_rot_sub = rospy.Subscriber("/human_rotation", Float32MultiArray,
                                               self.people_rot_callback)
 
-        self.valid_range_x = (0.2, 10.0)
-        self.valid_range_y = (0.2, 10.0)
+        self.valid_range_x = [0.2, 10.0]
+        self.valid_range_y = [0.2, 10.0]
+        self.robot_pose = np.zeros((3, ))
+
+        self.human_rot_inversion = -1.0
+        self.human_rot_offset = np.pi * 0.5
 
         # open file if in direct mode
         if self.flag_log_to_file:
             self.save_file = open(self.save_path + "/" + file_name)
+
+    def load_env_config(self, robot_pose, ranges):
+        self.robot_pose = robot_pose
+        self.valid_range_x, self.valid_range_y = ranges
 
     def log(self, t_start):
         while (not self.pos_queue.empty()) and (not self.rot_queue.empty()):
@@ -75,9 +83,9 @@ class DataLogger(object):
         # first convert from odom frame to "world" frame
         pos = np.array([position.x, position.y])
 
-        th = np.pi / 4.0
+        th = self.robot_pose[2]
         rot = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
-        pos = rot.dot(pos)
+        pos = rot.dot(pos) + self.robot_pose[:2]
 
         if pos[0] < self.valid_range_x[0] or pos[0] > self.valid_range_x[1] or \
                         pos[1] < self.valid_range_y[0] or pos[1] > self.valid_range_y[1]:
@@ -104,16 +112,17 @@ class DataLogger(object):
                 break
 
     def people_rot_callback(self, rot_msg):
-        # self.human_pose[2] = rot_msg.data[0]
-
         for i in range(4):
             self.cal_data[i] = rot_msg.data[i+1]
 
+        # correct rotation
+        rot = (rot_msg.data[0] - self.human_rot_offset) * self.human_rot_inversion
+
         if self.rot_queue.full():
             self.rot_queue.get()
-        self.rot_queue.put_nowait(rot_msg.data[0])
+        self.rot_queue.put_nowait(rot)
 
-        self.pose_latest[2] = rot_msg.data[0]
+        self.pose_latest[2] = rot
 
 
 if __name__ == "__main__":

@@ -232,5 +232,17 @@ def single_action_sample_example(n_samples, modality):
     plt.show()
 
 
+def save_default_model(usr_id, save_path):
+    # create a model object
+    model = MovementModel()
+    model.load_model("/home/yuhang/Documents/proactive_guidance/training_data/user" + str(usr_id))
+    model.set_default_param()
+
+    # save model
+    with open(save_path + "/user" + str(usr_id) + "_default.pkl", "w") as f:
+        pickle.dump(model, f)
+
+
 if __name__ == "__main__":
-    single_action_sample_example(5, "audio")
+    # single_action_sample_example(5, "audio")
+    save_default_model(0, "../../resources/pretrained_models/human_models")

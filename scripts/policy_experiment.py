@@ -19,9 +19,9 @@ class PolicyExperiment(object):
         # read in configurations
         # load planner
         self.planner = None
-        planner_file = rospy.get_param("~planner", "naive_planner.pkl")
-        with open(planner_file) as f:
-            self.planner = pickle.load(f)
+        planner_dir = rospy.get_param("~planner_dir", "naive_planners")
+        # with open(planner_file) as f:
+        #     self.planner = pickle.load(f)
 
         # feedback modality
         self.modality = rospy.get_param("~modality", "haptic")
@@ -40,7 +40,12 @@ class PolicyExperiment(object):
 
         # create a data logger
         path_saving = rospy.get_param("~path_saving", ".")
+        robot_pose = rospy.get_param("~robot_pose", [0.0, 1.0, 0.0])
+        x_range = rospy.get_param("~x_range", [-5.0, 5.0])
+        y_range = rospy.get_param("~y_range", [-1.0, 5.0])
+
         self.logger = DataLogger(path_saving, False)
+        self.logger.load_env_config(robot_pose, [x_range, y_range])
 
         # experiment mode
         self.mode = rospy.get_param("~mode", "manual")      # can be 'manual' or 'auto'

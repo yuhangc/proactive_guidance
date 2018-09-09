@@ -36,27 +36,34 @@ def generate_naive_continuous_random_protocol(file_name, n_dir, n_rep, mag):
 def generate_free_space_protocol(file_name, n_rep_trial, n_rep_throw):
     # set parameters
     robot_pose = np.array([0.0, 1.0, 0.0])
-    start_pose = np.array([0.0, 3.0, 1.0])
+    start_pose = np.array([-1.0, 3.0, 1.0])
 
-    target_dirs = np.deg2rad(np.array([30.0, -30.0, 150.0, -150.0]))
-    # target_dirs = np.deg2rad(np.array([30.0, -30.0]))
+    # target_dirs = np.deg2rad(np.array([30.0, -30.0, 150.0, -150.0]))
+    target_dirs = np.deg2rad(np.array([30.0, -30.0]))
     confusion_ang = np.deg2rad(15.0)
-    target_dist = 4.5
+    target_dist = 5.0
+    confusion_dist = 4.0
 
     targets = []
 
+    target_id = -1
     for ang in target_dirs:
         # targets are in robot/laser reference frame
-        pos = np.zeros((3, ))
-        pos[1:] = np.array([np.cos(ang), np.sin(ang)]) * target_dist + start_pose[:2] - robot_pose[:2]
+        target_id += 1
+        pos = np.zeros((4, ))
+        pos[0] = target_id
+        pos[2:] = np.array([np.cos(ang), np.sin(ang)]) * target_dist + start_pose[:2] - robot_pose[:2]
 
         for i in range(n_rep_trial):
             targets.append(pos)
 
         for alp in [-confusion_ang, confusion_ang]:
             ang1 = ang + alp
-            pos = np.zeros((3, ))
-            pos[1:] = np.array([np.cos(ang1), np.sin(ang1)]) * target_dist + start_pose[:2] - robot_pose[:2]
+
+            target_id += 1
+            pos = np.zeros((4, ))
+            pos[0] = target_id
+            pos[2:] = np.array([np.cos(ang1), np.sin(ang1)]) * confusion_dist + start_pose[:2] - robot_pose[:2]
 
             for i in range(n_rep_throw):
                 targets.append(pos)
@@ -71,5 +78,5 @@ def generate_free_space_protocol(file_name, n_rep_trial, n_rep_throw):
 if __name__ == "__main__":
     # generate_naive_random_policy("random_protocol.txt", 5, 8, 3)
     # generate_naive_continuous_random_protocol("random_continuous_protocol_10rep2.txt", 24, 10, 2)
-    generate_free_space_protocol("free_space_exp_protocol_4targets.txt", 5, 2)
+    generate_free_space_protocol("free_space_exp_protocol_2targets.txt", 5, 2)
 
