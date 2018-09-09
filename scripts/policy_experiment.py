@@ -19,7 +19,7 @@ class PolicyExperiment(object):
         # read in configurations
         # load planner
         self.planner = None
-        planner_dir = rospy.get_param("~planner_dir", "naive_planners")
+        self.planner_dir = rospy.get_param("~planner_dir", "naive_planners")
         # with open(planner_file) as f:
         #     self.planner = pickle.load(f)
 
@@ -34,6 +34,7 @@ class PolicyExperiment(object):
         self.resuming_dt = rospy.get_param("~resuming_dt", 5.0)
         self.t_reset_start = 0.0
         self.t_resume_start = 0.0
+        self.t_trial_start = 0.0
 
         # goal reaching threshold
         self.goal_reaching_th = rospy.get_param("~goal_reaching_th", 0.5)
@@ -127,6 +128,20 @@ class PolicyExperiment(object):
 
         return cmd
 
+    def start_trial(self):
+        self.flag_start_trial = False
+
+        # load planner
+        target_id = int(self.proto_data[self.trial, 0])
+        with open(self.planner_dir + "/target" + str(target_id) + ".pkl") as f:
+            self.planner = pickle.load(f)
+
+        # reset data logger
+        self.logger.reset()
+
+        print "Starting trial ", self.trial, "...\r"
+        self.t_trial_start = rospy.get_time()
+
     def _loop(self, trial_start):
         self.trial = trial_start
 
@@ -146,7 +161,6 @@ class PolicyExperiment(object):
         self.state = "Resetting"
         self.flag_start_trial = False
         t_last = rospy.get_time()
-        t_start = rospy.get_time()
 
         while not rospy.is_shutdown() and not self.flag_end_program:
             if self.state == "Running":
@@ -180,7 +194,7 @@ class PolicyExperiment(object):
                     t_last = rospy.get_time()
 
                 # log data every loop
-                self.logger.log(t_start)
+                self.logger.log(self.t_trial_start)
 
             elif self.state == "Resetting":
                 # wait for some time or user input to start the next trial
@@ -192,13 +206,7 @@ class PolicyExperiment(object):
                     flag_start_trial = self.flag_start_trial
 
                 if flag_start_trial:
-                    self.flag_start_trial = False
-
-                    # reset data logger
-                    self.logger.reset()
-
-                    print "Starting trial ", self.trial, "...\r"
-                    t_start = rospy.get_time()
+                    self.start_trial()
 
             elif self.state == "Pausing":
                 # wait for user input
@@ -211,8 +219,7 @@ class PolicyExperiment(object):
             elif self.state == "Resuming":
                 # wait for timer
                 if rospy.get_time() - self.t_resume_start >= self.resuming_dt:
-                    t_start = rospy.get_time
-                    self.state = "Running"
+                    self.start_trial()
 
     def run(self, trial_start):
         key_thread = threading.Thread(target=self._monitor_key)

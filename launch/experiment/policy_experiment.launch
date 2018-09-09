@@ -7,7 +7,7 @@
 
     <node name="policy_experiment" pkg="proactive_guidance" type="policy_experiment.py" output="screen">
         <param name="planner_dir"
-               value="$(find proactive_guidance)/resources/pretrained_models/$(arg policy)_$(arg policy)/free_space" />
+               value="$(find proactive_guidance)/resources/pretrained_models/$(arg policy)_$(arg modality)/free_space" />
         <param name="modality" value="$(arg modality)" />
         <param name="protocol_file"
                value="$(find proactive_guidance)/resources/protocols/free_space_exp_protocol_2targets.txt"/>
