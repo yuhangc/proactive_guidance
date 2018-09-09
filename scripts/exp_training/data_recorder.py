@@ -13,6 +13,7 @@ class DataLogger(object):
         self.flag_log_to_file = flag_log_to_file
 
         self.human_pose = np.zeros((3,))
+        self.pose_latest = np.zeros((3, ))
         self.human_vel = np.zeros((3, ))
         self.cal_data = np.zeros((4, ))
         self.t_meas = rospy.get_time()
@@ -67,6 +68,9 @@ class DataLogger(object):
         with self.rot_queue.mutex:
             self.rot_queue.queue.clear()
 
+    def get_pose(self):
+        return self.pose_latest
+
     def filter_measurement(self, position):
         # first convert from odom frame to "world" frame
         pos = np.array([position.x, position.y])
@@ -93,6 +97,10 @@ class DataLogger(object):
                 if self.pos_queue.full():
                     self.pos_queue.get()
                 self.pos_queue.put_nowait((people.header.stamp.to_sec(), people.pos.x, people.pos.y))
+
+                self.pose_latest[0] = people.pos.x
+                self.pose_latest[1] = people.pos.y
+
                 break
 
     def people_rot_callback(self, rot_msg):
@@ -104,6 +112,8 @@ class DataLogger(object):
         if self.rot_queue.full():
             self.rot_queue.get()
         self.rot_queue.put_nowait(rot_msg.data[0])
+
+        self.pose_latest[2] = rot_msg.data[0]
 
 
 if __name__ == "__main__":
