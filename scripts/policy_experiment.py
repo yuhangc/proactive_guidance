@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+
+import sys
+sys.path.append("/home/yuhang/ros_dev/src/proactive_guidance/scripts/model_plan")
+
 import numpy as np
 import pickle
 import threading
@@ -41,9 +45,9 @@ class PolicyExperiment(object):
 
         # create a data logger
         path_saving = rospy.get_param("~path_saving", ".")
-        robot_pose = rospy.get_param("~robot_pose", [0.0, 1.0, 0.0])
+        robot_pose = rospy.get_param("~robot_pose", [0.0, 1.0, np.pi * 0.5])
         x_range = rospy.get_param("~x_range", [-5.0, 5.0])
-        y_range = rospy.get_param("~y_range", [-1.0, 5.0])
+        y_range = rospy.get_param("~y_range", [-1.0, 6.0])
 
         self.logger = DataLogger(path_saving, False)
         self.logger.load_env_config(robot_pose, [x_range, y_range])
@@ -79,7 +83,7 @@ class PolicyExperiment(object):
         # publish haptic feedback
         haptic_msg = String()
         haptic_msg.data = "{:d},{:d}".format(int(ctrl[0]), int(ctrl[1]))
-        print haptic_msg.data
+        print haptic_msg.data, "\r"
 
         self.haptic_msg_pub.publish(haptic_msg)
 
@@ -100,7 +104,7 @@ class PolicyExperiment(object):
         print "Experiment terminated...\r"
 
     def check_for_stop(self, s):
-        err = np.linalg.norm(s[:2] - self.proto_data[self.trial, 1:3])
+        err = np.linalg.norm(s[:2] - self.proto_data[self.trial, 2:4])
 
         if err < self.goal_reaching_th:
             # send a stop command
@@ -141,6 +145,8 @@ class PolicyExperiment(object):
 
         print "Starting trial ", self.trial, "...\r"
         self.t_trial_start = rospy.get_time()
+        
+        self.state = "Running"
 
     def _loop(self, trial_start):
         self.trial = trial_start
@@ -161,12 +167,15 @@ class PolicyExperiment(object):
         self.state = "Resetting"
         self.flag_start_trial = False
         t_last = rospy.get_time()
+        self.t_reset_start = rospy.get_time()
 
         while not rospy.is_shutdown() and not self.flag_end_program:
             if self.state == "Running":
                 if rospy.get_time() - t_last >= self.planner_dt:
                     # get latest tracking
                     pose = self.logger.get_pose()
+                    print "human pose is: ", pose, "\r"
+                    print self.planner.s_g, "\r"
 
                     # first check for stop
                     if self.check_for_stop(pose):
@@ -178,7 +187,7 @@ class PolicyExperiment(object):
                         # check if exp ends
                         self.trial += 1
                         if self.trial >= len(self.proto_data):
-                            print "All trials finished!/r"
+                            print "All trials finished!\r"
                             break
 
                         # prepare to reset
@@ -189,7 +198,7 @@ class PolicyExperiment(object):
                         cmd = self.planner.sample_policy(pose)
 
                         # convert to right format and publish
-                        self.publish_haptic_control(self.convert_feedback(cmd))
+                        self.publish_haptic_control([self.convert_feedback(cmd), 2])
 
                     t_last = rospy.get_time()
 

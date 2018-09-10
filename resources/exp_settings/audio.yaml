@@ -1,4 +1,4 @@
-planner_dt: 2.5
+planner_dt: 3.0
 resetting_dt: 10.0
 resuming_dt: 5.0
 

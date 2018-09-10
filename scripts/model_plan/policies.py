@@ -523,18 +523,18 @@ if __name__ == "__main__":
     # validate_MDP_policy("/home/yuhang/Documents/proactive_guidance/training_data/user0",
     #                     flag_with_obs=True, flag_plan=False)
 
-    # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
-    #                         "../../resources/pretrained_models",
-    #                         "haptic")
+    generate_naive_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
+                            "../../resources/pretrained_models",
+                            "haptic")
     #
     # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
     #                         "../../resources/pretrained_models",
     #                         "audio")
 
-    generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
-                          "../../resources/pretrained_models",
-                          "haptic")
+    #generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
+    #                      "../../resources/pretrained_models",
+    #                      "haptic")
 
-    generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
-                          "../../resources/pretrained_models",
-                          "audio")
+    # generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
+    #                      "../../resources/pretrained_models",
+    #                      "audio")

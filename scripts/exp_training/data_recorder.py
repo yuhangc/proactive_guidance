@@ -38,7 +38,7 @@ class DataLogger(object):
         self.robot_pose = np.zeros((3, ))
 
         self.human_rot_inversion = -1.0
-        self.human_rot_offset = np.pi * 0.5
+        self.human_rot_offset = 188.0
 
         # open file if in direct mode
         if self.flag_log_to_file:
@@ -85,18 +85,19 @@ class DataLogger(object):
 
         th = self.robot_pose[2]
         rot = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
-        pos = rot.dot(pos) + self.robot_pose[:2]
+        pos = rot.dot(pos) # + self.robot_pose[:2]
 
         if pos[0] < self.valid_range_x[0] or pos[0] > self.valid_range_x[1] or \
                         pos[1] < self.valid_range_y[0] or pos[1] > self.valid_range_y[1]:
-            return False
+            return False, pos
 
-        return True
+        return True, pos
 
     def people_tracking_callback(self, tracking_msg):
         # filter out outliers
         for people in tracking_msg.people:
-            if self.filter_measurement(people.pos):
+            flag_inlier, pos_trans = self.filter_measurement(people.pos)
+            if flag_inlier:
                 # self.t_meas = tracking_msg.header.stamp.to_sec()
                 # self.human_pose[0] = people.pos.x
                 # self.human_pose[1] = people.pos.y
@@ -104,10 +105,10 @@ class DataLogger(object):
                 # push into queue
                 if self.pos_queue.full():
                     self.pos_queue.get()
-                self.pos_queue.put_nowait((people.header.stamp.to_sec(), people.pos.x, people.pos.y))
+                self.pos_queue.put_nowait((people.header.stamp.to_sec(), pos_trans[0], pos_trans[1]))
 
-                self.pose_latest[0] = people.pos.x
-                self.pose_latest[1] = people.pos.y
+                self.pose_latest[0] = pos_trans[0]
+                self.pose_latest[1] = pos_trans[1]
 
                 break
 
@@ -122,7 +123,7 @@ class DataLogger(object):
             self.rot_queue.get()
         self.rot_queue.put_nowait(rot)
 
-        self.pose_latest[2] = rot
+        self.pose_latest[2] = np.deg2rad(rot)
 
 
 if __name__ == "__main__":
