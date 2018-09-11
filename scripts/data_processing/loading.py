@@ -3,6 +3,8 @@
 import numpy as np
 import pickle
 
+import matplotlib.pyplot as plt
+
 
 def wrap_to_pi(ang):
     return (ang + np.pi) % (2 * np.pi) - np.pi
@@ -75,11 +77,41 @@ def load_save_all(root_path, protocol_file, n_trial, offsets=None, flag_transfor
         pickle.dump((t_all, pose_all, protocol_data), f)
 
 
+def load_free_space_test(root_path, protocol_file):
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+
+    n_trial = len(protocol_data)
+
+    t_all = []
+    pose_all =[]
+    for trial in range(n_trial):
+        data = np.loadtxt(root_path + "/trial" + str(trial) + ".txt", delimiter=", ")
+        t_all.append(data[:, 0])
+        pose_all.append(data[:, 1:])
+
+    # visualize
+    # generate a color map
+    n_colors = int(np.max(protocol_data[:, 0]))
+    cm = plt.get_cmap("gist_rainbow")
+
+    fig, axes = plt.subplots()
+    for trial in range(n_trial):
+        traj = pose_all[trial]
+
+        axes.plot(traj[:, 0], traj[:, 1], color=cm(1. * protocol_data[trial, 0] / n_colors))
+        axes.axis("equal")
+
+    plt.show()
+
+
 if __name__ == "__main__":
     # load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/test1-0830",
     #               "../../resources/protocols/random_continuous_protocol_10rep2.txt",
     #               120, (2.13, 2.74, -np.pi * 0.75, -np.pi * 0.5))
 
-    load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/user0/audio",
-                  "../../resources/protocols/random_continuous_protocol_5rep2.txt",
-                  120, (2.13, 3.0, -np.pi * 0.75, np.pi))
+    # load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/user0/audio",
+    #               "../../resources/protocols/random_continuous_protocol_5rep2.txt",
+    #               120, (2.13, 3.0, -np.pi * 0.75, np.pi))
+
+    load_free_space_test("/home/yuhang/Documents/proactive_guidance/test_free_space/user0/naive",
+                         "../../resources/protocols/free_space_exp_protocol_2targets.txt")

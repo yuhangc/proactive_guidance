@@ -70,6 +70,7 @@ class MDPFixedTimePolicy(object):
 
         # value function, Q function, policy, rewards
         self.V = -1000.0 * np.ones((self.nX, self.nY, self.nAlp))
+        self.n_comm = np.zeros((self.nX, self.nY, self.nAlp))
         self.Q = np.zeros((self.nX, self.nY, self.nAlp, self.nA))
         self.policy = np.zeros((self.nX, self.nY, self.nAlp))
 
@@ -284,12 +285,14 @@ class MDPFixedTimePolicy(object):
                     # iterate over all actions
                     Q_max = -1000.0
                     a_opt = 0.0
+                    n_comm_opt = 0.0
 
                     # only sample actions that make sense
                     a_list = wrap_to_pi(da * np.arange(0, self.nA) - a_range / 2.0 + self.policy[xg, yg, alp_g])
 
                     for ai, a in enumerate(a_list):
                         Vnext = 0.0
+                        n_comm_next = 0.0
                         for k in range(self.n_samples):
                             # sample a new state
                             self.tmodel.set_state(x, y, alp)
@@ -297,22 +300,27 @@ class MDPFixedTimePolicy(object):
                             if s_next[0] < self.x_range[0] or s_next[0] >= self.x_range[1] or \
                                             s_next[1] < self.y_range[0] or s_next[1] >= self.y_range[1]:
                                 Vnext += self.r_obs
+                                n_comm_next += 20
                             else:
                                 Vnext += self.get_value(self.V, s_next[0], s_next[1], s_next[2])
+                                n_comm_next += self.get_value(self.n_comm, s_next[0], s_next[1], s_next[2])
 
                         # if Vnext != 0:
                         #     print "here"
 
                         self.Q[xg, yg, alp_g, ai] = self.gamma * Vnext / self.n_samples
+                        n_comm_next /= self.n_samples
 
                         if self.Q[xg, yg, alp_g, ai] > Q_max:
                             Q_max = self.Q[xg, yg, alp_g, ai]
+                            n_comm_opt = n_comm_next
                             a_opt = a
 
                     # update value function and policy
                     # only update value for non-obstacle states
                     if not self.obs[xg, yg]:
                         self.V[xg, yg, alp_g] = Q_max
+                    self.n_comm[xg, yg, alp_g] = n_comm_opt + 1
 
                     if self.policy[xg, yg, alp_g] != a_opt:
                         self.policy[xg, yg, alp_g] = a_opt
@@ -337,6 +345,9 @@ class MDPFixedTimePolicy(object):
 
     def get_value_func(self, s):
         return self.get_value(self.V, s[0], s[1], wrap_to_pi(s[2]))
+
+    def get_n_comm(self, s):
+        return self.get_value(self.n_comm, s[0], s[1], wrap_to_pi(s[2]))
 
     def visualize_policy(self, ax=None):
         Vplot = np.max(self.V, axis=2)
@@ -373,7 +384,7 @@ def simulate_naive_policy(n_trials, s_g, modality):
 
 def validate_MDP_policy(root_path, flag_with_obs=True, flag_plan=True):
     s_g = np.array([4.0, 3.0, 0.0])
-    modality = "audio"
+    modality = "haptic"
 
     obs_list = [(1.5, 2.00, 1.0, 1.25),
                 (2.0, 1.0, 1.25, 0.5)]
@@ -527,12 +538,12 @@ def mkdir_p(mypath):
 
 if __name__ == "__main__":
     # simulate_naive_policy(30, np.array([3.0, 2.0, 0.0]), "haptic")
-    # validate_MDP_policy("/home/yuhang/Documents/proactive_guidance/training_data/user0",
-    #                     flag_with_obs=True, flag_plan=False)
+    validate_MDP_policy("/home/yuhang/Documents/proactive_guidance/training_data/user0",
+                        flag_with_obs=True, flag_plan=True)
 
-    generate_naive_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
-                            "../../resources/pretrained_models",
-                            "haptic")
+    # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
+    #                         "../../resources/pretrained_models",
+    #                         "haptic")
     #
     # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
     #                         "../../resources/pretrained_models",
