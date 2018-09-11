@@ -149,6 +149,28 @@ class MovementModel(object):
         else:
             return np.asarray(t_traj), np.asarray(traj)
 
+    def sample_traj_no_action(self, a, dt, T):
+        t_traj = [0.0]
+        traj = [self.s.copy()]
+
+        modality, alpha_d = a
+
+        # sample straight walking motion
+        t = 0.0
+        s_new = traj[0]
+        while t + dt < T:
+            s_new = self.sample_walking(s_new, a, dt)
+            t += dt
+
+            t_traj.append(t)
+            traj.append(s_new)
+
+        s_new = self.sample_walking(s_new, (a[0], alpha_d), T - t)
+        t_traj.append(T)
+        traj.append(s_new)
+
+        return np.asarray(t_traj), np.asarray(traj)
+
     def sample_traj_action_list(self, a_list, dt, T):
         pass
 
