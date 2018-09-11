@@ -88,7 +88,7 @@ class MovementModel(object):
         traj[-1, 2] = wrap_to_pi(traj[-1, 2])
         return traj[-1]
 
-    def sample_traj_single_action(self, a, dt, T):
+    def sample_traj_single_action(self, a, dt, T, flag_return_alp=False):
         """
         Simulate the trajectory given a single communication action
         :param a: action in the form of (modality, alpha_d)
@@ -144,7 +144,10 @@ class MovementModel(object):
         t_traj.append(T)
         traj.append(s_new)
 
-        return np.asarray(t_traj), np.asarray(traj)
+        if flag_return_alp:
+            return alpha_d, np.asarray(t_traj), np.asarray(traj)
+        else:
+            return np.asarray(t_traj), np.asarray(traj)
 
     def sample_traj_action_list(self, a_list, dt, T):
         pass
@@ -195,6 +198,14 @@ class MovementModel(object):
         s_new[2] = heading
 
         return s_new
+
+    def get_prob_alp_d(self, a, alp_d):
+        ad_mean, ad_std = self.gp_model[a[0]].predict_fast(a[1])[0]
+
+        var = ad_std ** 2
+        a_diff = alp_d - ad_mean
+
+        return np.exp(-a_diff**2 / 2.0 / var) / np.sqrt(2.0 * np.pi * var)
 
 
 def single_action_sample_example(n_samples, modality):

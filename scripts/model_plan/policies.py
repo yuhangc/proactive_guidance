@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
+import time
 import pickle
 from collections import deque
 
@@ -334,6 +335,9 @@ class MDPFixedTimePolicy(object):
     def sample_policy(self, s):
         return self.get_value_ang(self.policy, s[0], s[1], wrap_to_pi(s[2]))
 
+    def get_value_func(self, s):
+        return self.get_value(self.V, s[0], s[1], wrap_to_pi(s[2]))
+
     def visualize_policy(self, ax=None):
         Vplot = np.max(self.V, axis=2)
         for xg in range(self.nX):
@@ -406,8 +410,11 @@ def validate_MDP_policy(root_path, flag_with_obs=True, flag_plan=True):
     n_trials = 30
 
     traj_list = []
+    start_time = time.time()
     for i in range(n_trials):
-        traj_list.append(sim.run_trial((1.0, 1.5, 0.0), s_g, modality, 30.0, tol=0.5))
+        traj_list.append(sim.run_trial((0.5, 0.5, 0.0), s_g, modality, 30.0, tol=0.5))
+
+    print "--- %s seconds ---" % (time.time() - start_time)
 
     fig, axes = plt.subplots()
     for i in range(n_trials):
@@ -531,10 +538,10 @@ if __name__ == "__main__":
     #                         "../../resources/pretrained_models",
     #                         "audio")
 
-    #generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
-    #                      "../../resources/pretrained_models",
-    #                      "haptic")
-
     # generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
-    #                      "../../resources/pretrained_models",
-    #                      "audio")
+    #                       "../../resources/pretrained_models",
+    #                       "haptic")
+    #
+    # generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
+    #                       "../../resources/pretrained_models",
+    #                       "audio")
