@@ -61,7 +61,7 @@ class MCTSTrajNode(MCTSNodeBase):
         self.goal_reached = False
 
 
-class MCTSPolicy:
+class MCTSPolicy(object):
     def __init__(self, model, default_policy, modality):
         self.policy_tree_root = None
         self.root_no_comm = None
@@ -371,8 +371,12 @@ class MCTSPolicy:
             a_node = traj_node.parent
             # a_node.count += 1
             a_node.value += self.gamma**((t_curr - a_node.t) * self.gamma_scale) * v
-            a_node.n_comm += n_comm + 1
-            n_comm += 1
+
+            if a_node.a is None:
+                a_node.n_comm += n_comm
+            else:
+                a_node.n_comm += n_comm + 1
+                n_comm += 1
 
             a_node.score = self.score_w_value * a_node.value + self.score_w_comm * a_node.n_comm
 
@@ -413,6 +417,20 @@ class MCTSPolicy:
             t = time.time() - start_time
 
         print "Has grown tree ", counter, " times"
+
+    def get_policy(self):
+        a_opt = None
+        v_max = -1000.0
+        for child in self.policy_tree_root.children:
+            if child.score / child.count > v_max:
+                v_max = child.score / child.count
+                a_opt = child.a
+
+        return a_opt, v_max
+
+    def get_policy_no_comm(self):
+        v = self.root_no_comm.children[0].score / self.root_no_comm.children[0].count
+        return v
 
     def visualize_search_tree(self, node, ax):
         if node.type == "state":
