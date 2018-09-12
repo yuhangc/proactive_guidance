@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 import pickle
 import time
+import threading
 
 from pre_processing import wrap_to_pi
 from movement_model import MovementModel, MovementModelParam
@@ -75,7 +76,7 @@ class MCTSPolicy(object):
         self.x_range = self.default_policy.x_range
         self.y_range = self.default_policy.y_range
 
-        self.goal_reaching_th = 0.5
+        self.goal_reaching_th = 0.25
 
         # obstacle
         # TODO: how to handle?
@@ -87,14 +88,14 @@ class MCTSPolicy(object):
         self.action_widen_factor = 0.2
         self.traj_widen_factor = 0.2
         self.time_widen_factor = 0.2
-        self.traj_widen_factor_no_comm = 0.2
+        self.traj_widen_factor_no_comm = 0.1
 
         self.uct_weight = 1
 
         self.traj_sample_dt = 0.5
         self.traj_sample_T = 5.0
 
-        self.time_sample_factor1 = 5.0
+        self.time_sample_factor1 = 6.0
         self.time_sample_factor2 = -2.0
 
         self.gamma = 0.95
@@ -102,6 +103,13 @@ class MCTSPolicy(object):
 
         self.score_w_value = 1.0
         self.score_w_comm = -0.5
+
+        self.n_comm_back_prop_ratio = 0.5
+
+        self.no_new_node_th = 100
+
+        # print lock
+        self.print_lock = threading.Lock()
 
     def gen_action_list(self, s):
         # want to uniformly explore actions
@@ -159,6 +167,11 @@ class MCTSPolicy(object):
                     or traj[i, 1] < self.y_range[0] or traj[i, 1] >= self.y_range[1]:
                 return i, False
 
+            # check obstacle
+            # if self.default_policy.is_obs(traj[i]):
+            if self.default_policy.get_value_func(traj[i]) < -20:
+                return i, False
+
         return T, False
 
     def select_traj(self, action_node):
@@ -168,10 +181,14 @@ class MCTSPolicy(object):
         n = len(action_node.children)
         if np.power(action_node.count, self.traj_widen_factor) > n:
             self.model.set_state(action_node.s[0], action_node.s[1], action_node.s[2])
-            alp_d, t, traj = self.model.sample_traj_single_action((self.modality, action_node.a),
-                                                                  self.traj_sample_dt,
-                                                                  self.traj_sample_T,
-                                                                  flag_return_alp=True)
+            try:
+                alp_d, t, traj = self.model.sample_traj_single_action((self.modality, action_node.a),
+                                                                      self.traj_sample_dt,
+                                                                      self.traj_sample_T,
+                                                                      flag_return_alp=True)
+            except:
+                print "this shouldn't happen"
+
             t += action_node.t
 
             # check trajectory
@@ -183,7 +200,7 @@ class MCTSPolicy(object):
                 traj_node.parent = action_node
                 action_node.children.append(traj_node)
             else:
-                # oob immediately
+                # oob immediately/too soon
                 if tf <= 3:
                     return None
 
@@ -228,6 +245,8 @@ class MCTSPolicy(object):
                 print "this shouldn't happen"
             return np.random.choice(elm, p=chances)
         else:
+            if len(elm) == 0:
+                print "this shouldn't happen"
             return np.random.choice(np.arange(len(traj_node.children)), p=chances)
 
     def select_time(self, traj_node):
@@ -246,7 +265,8 @@ class MCTSPolicy(object):
                 traj_node.children.append(state_node)
                 return state_node
         else:
-            if np.power(traj_node.count, self.time_widen_factor) > n:
+            if np.power(traj_node.count, self.time_widen_factor) > n and \
+                            len(traj_node.children) < len(traj_node.traj[0])-1:
                 i = self.sample_time(traj_node, True)
                 traj_node.selected[i] = 1
                 state_node = MCTSStateNode(traj_node.traj[1][i], (traj_node.alp_d, 0.0), traj_node.traj[0][i])
@@ -275,10 +295,13 @@ class MCTSPolicy(object):
         # instead of run real roll out, use value functions from offline policy
         t_curr = node.t
         v = self.default_policy.get_value_func(node.s)
-        n_comm = self.default_policy.get_n_comm(node.s)
+        n_comm = self.default_policy.get_n_comm(node.s) * self.n_comm_back_prop_ratio
 
         if node.count == 0:
             node.count = 1
+            flag_new_node = True
+        else:
+            flag_new_node = False
 
         while node.parent is not None:
             traj_node = node.parent
@@ -294,6 +317,8 @@ class MCTSPolicy(object):
 
             node = a_node.parent
             # node.count += 1
+
+        return flag_new_node
 
     def select_traj_no_comm(self, state_node, action_node):
         state_node.count += 1
@@ -359,10 +384,13 @@ class MCTSPolicy(object):
         # instead of run real roll out, use value functions from offline policy
         t_curr = node.t
         v = self.default_policy.get_value_func(node.s)
-        n_comm = self.default_policy.get_n_comm(node.s)
+        n_comm = self.default_policy.get_n_comm(node.s) * self.n_comm_back_prop_ratio
 
         if node.count == 0:
             node.count = 1
+            flag_new_node = True
+        else:
+            flag_new_node = False
 
         while node.parent is not None:
             traj_node = node.parent
@@ -383,6 +411,8 @@ class MCTSPolicy(object):
             node = a_node.parent
             # node.count += 1
 
+        return flag_new_node
+
     def generate_policy(self, s_init, t_max=0.8):
         start_time = time.time()
 
@@ -392,12 +422,17 @@ class MCTSPolicy(object):
         # keep growing tree until time reached
         t = time.time() - start_time
         counter = 0
+        counter_no_new_node = 0
         while t < t_max:
-            self.grow_tree()
+            if not self.grow_tree():
+                counter_no_new_node += 1
+            if counter_no_new_node > self.no_new_node_th:
+                break
             counter += 1
             t = time.time() - start_time
 
-        print "Has grown tree ", counter, " times"
+        with self.print_lock:
+            print "With Comm: has grown tree ", counter, " times"
 
     def generate_policy_no_comm(self, s_init, b_init, t_max=0.8):
         start_time = time.time()
@@ -411,12 +446,17 @@ class MCTSPolicy(object):
 
         t = time.time() - start_time
         counter = 0
+        counter_no_new_node = 0
         while t < t_max:
-            self.grow_tree_no_comm()
+            if not self.grow_tree_no_comm():
+                counter_no_new_node += 1
+            if counter_no_new_node > self.no_new_node_th:
+                break
             counter += 1
             t = time.time() - start_time
 
-        print "Has grown tree ", counter, " times"
+        with self.print_lock:
+            print "No Comm: has grown tree ", counter, " times"
 
     def get_policy(self):
         a_opt = None
@@ -498,9 +538,9 @@ def policy_search_example(policy_path, modality, flag_no_comm=False):
     print "Goal is: ", mcts_policy.s_g
 
     # generate and visualize tree
+    s_init = np.array([3.5, 0.5, 1.5])
     if flag_no_comm:
-        s_init = np.array([0.5, 0.5, 0.0])
-        b_init = (0.0, 0.1)
+        b_init = (1.5, 0.1)
         mcts_policy.generate_policy_no_comm(s_init, b_init, t_max=0.8)
 
         fig, ax = plt.subplots()
@@ -515,7 +555,6 @@ def policy_search_example(policy_path, modality, flag_no_comm=False):
 
         plt.show()
     else:
-        s_init = np.array([0.5, 0.5, 0.0])
         mcts_policy.generate_policy(s_init, t_max=0.8)
 
         fig, ax = plt.subplots()
@@ -533,4 +572,4 @@ def policy_search_example(policy_path, modality, flag_no_comm=False):
 
 if __name__ == "__main__":
     policy_search_example("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
-                          "haptic", flag_no_comm=True)
+                          "haptic", flag_no_comm=False)

@@ -349,6 +349,9 @@ class MDPFixedTimePolicy(object):
     def get_n_comm(self, s):
         return self.get_value(self.n_comm, s[0], s[1], wrap_to_pi(s[2]))
 
+    def is_obs(self, s):
+        return self.get_value_func(s) < -20.0
+
     def visualize_policy(self, ax=None):
         Vplot = np.max(self.V, axis=2)
         for xg in range(self.nX):

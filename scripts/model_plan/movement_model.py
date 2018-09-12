@@ -57,7 +57,7 @@ class MovementModel(object):
         self.params["haptic"].delay = np.log(1.0)
         self.params["haptic"].om = 2.0
         self.params["haptic"].vd = 0.6
-        self.params["haptic"].std_delay = 0.3
+        self.params["haptic"].std_delay = 0.2
         self.params["haptic"].std_om = 0.3
         self.params["haptic"].std_vd = 0.1
         self.params["haptic"].std_vd_heading = 0.1
@@ -65,7 +65,7 @@ class MovementModel(object):
         self.params["audio"].delay = np.log(2.0)
         self.params["audio"].om = 2.0
         self.params["audio"].vd = 0.6
-        self.params["audio"].std_delay = 0.3
+        self.params["audio"].std_delay = 0.2
         self.params["audio"].std_om = 0.3
         self.params["audio"].std_vd = 0.1
         self.params["audio"].std_vd_heading = 0.1

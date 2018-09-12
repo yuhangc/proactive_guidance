@@ -60,9 +60,9 @@ class Planner(object):
     def compute_plan(self, t_max=0.8):
         if self.flag_initialized:
             # create two threads to run plan separately?
-            thread_comm = threading.Thread(target=self.mcts_policy.generate_policy, args=[self.s, t_max-0.05])
+            thread_comm = threading.Thread(target=self.mcts_policy.generate_policy, args=[self.s, t_max-0.01])
             thread_no_comm = threading.Thread(target=self.mcts_policy.generate_policy_no_comm,
-                                              args=[self.s, (self.alp_d_mean, self.alp_d_cov**0.5), t_max-0.05])
+                                              args=[self.s, (self.alp_d_mean, self.alp_d_cov**0.5), t_max-0.01])
 
             thread_comm.start()
             thread_no_comm.start()
@@ -74,6 +74,13 @@ class Planner(object):
             # get and compare plan
             a_opt, v_comm = self.mcts_policy.get_policy()
             v_no_comm = self.mcts_policy.get_policy_no_comm()
+
+            # fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+            # self.mcts_policy.visualize_search_tree(self.mcts_policy.policy_tree_root, axes[0])
+            # self.mcts_policy.visualize_search_tree(self.mcts_policy.root_no_comm, axes[1])
+            # plt.show()
+
+            print "Value of communication is: ", v_comm, ", no communication is: ", v_no_comm
 
             if v_no_comm > v_comm:
                 return None
@@ -140,9 +147,7 @@ def validate_planner(policy_path, modality, rep):
     planner.create_policy(mdp_policy, modality)
 
     # initial state
-    s = np.array([0.5, 0.5, 0.0])
     s_g = mdp_policy.s_g
-    t = 0.0
     dt = 0.5
     T = 30.0
     tol = 0.5
@@ -157,6 +162,9 @@ def validate_planner(policy_path, modality, rep):
     for k in range(rep):
         planner.reset()
 
+        t = 0.0
+        s = np.array([0.5, 0.5, 0.0])
+
         t_list = [0.0]
         traj_list = [s.copy()]
         comm_states = []
@@ -170,7 +178,7 @@ def validate_planner(policy_path, modality, rep):
             if err <= tol:
                 # send stop command to human
                 t_traj, traj = human_model.sample_traj_single_action((modality, 10), traj_sample_dt, T-t)
-                t_list += list(t_traj)
+                t_list += list(t_traj+t)
                 traj_list += list(traj)
                 t = T
                 break
@@ -185,6 +193,7 @@ def validate_planner(policy_path, modality, rep):
 
                 human_model.set_state(s[0], s[1], s[2])
                 t_traj, traj = human_model.sample_traj_single_action((modality, a_opt), traj_sample_dt, traj_sample_T)
+                t_traj += t
 
                 t_list.append(t_traj[1])
                 traj_list.append(traj[1].copy())
