@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import pickle
 import time
 import threading
+import multiprocessing
 
 from pre_processing import wrap_to_pi
 from movement_model import MovementModel, MovementModelParam
@@ -76,7 +77,7 @@ class MCTSPolicy(object):
         self.x_range = self.default_policy.x_range
         self.y_range = self.default_policy.y_range
 
-        self.goal_reaching_th = 0.25
+        self.goal_reaching_th = 0.35
 
         # obstacle
         # TODO: how to handle?
@@ -88,7 +89,7 @@ class MCTSPolicy(object):
         self.action_widen_factor = 0.2
         self.traj_widen_factor = 0.2
         self.time_widen_factor = 0.2
-        self.traj_widen_factor_no_comm = 0.1
+        self.traj_widen_factor_no_comm = 0.2
 
         self.uct_weight = 1
 
@@ -106,7 +107,9 @@ class MCTSPolicy(object):
 
         self.n_comm_back_prop_ratio = 0.5
 
-        self.no_new_node_th = 100
+        self.no_new_node_th = 200
+
+        self.value_obs = -100.0
 
         # print lock
         self.print_lock = threading.Lock()
@@ -222,6 +225,8 @@ class MCTSPolicy(object):
         elm = []
         chances = []
 
+        if len(traj_node.traj[1]) == 0:
+            print "something is wrong"
         v0 = self.default_policy.get_value_func(traj_node.traj[1][0])
 
         for i in range(1, len(traj_node.traj[0])):
@@ -229,11 +234,11 @@ class MCTSPolicy(object):
                 s = np.array([traj_node.traj[1][i, 0], traj_node.traj[1][i, 1], traj_node.alp_d])
                 v = self.default_policy.get_value_func(s)
                 alp_d = self.default_policy.sample_policy(s)
-                alp_diff = wrap_to_pi(traj_node.alp_d - alp_d)
+                # alp_diff = wrap_to_pi(traj_node.alp_d - alp_d)
 
                 t = traj_node.traj[0][i] - traj_node.traj[0][0]
                 val = self.time_sample_factor1 * (v * self.gamma**(t * self.gamma_scale) - v0) +\
-                      self.time_sample_factor2 * alp_diff**2
+                      self.time_sample_factor2 * alp_d**2
 
                 elm.append(i)
                 chances.append(np.exp(val))
@@ -286,7 +291,7 @@ class MCTSPolicy(object):
             traj_node = self.select_traj(a_node)
 
             if traj_node is None:
-                a_node.value -= 100.0
+                a_node.value += self.value_obs
                 a_node.score = self.score_w_value * a_node.value + self.score_w_comm * a_node.n_comm
                 break
 
@@ -295,7 +300,11 @@ class MCTSPolicy(object):
         # instead of run real roll out, use value functions from offline policy
         t_curr = node.t
         v = self.default_policy.get_value_func(node.s)
-        n_comm = self.default_policy.get_n_comm(node.s) * self.n_comm_back_prop_ratio
+
+        if node.goal_reached:
+            n_comm = 0.0
+        else:
+            n_comm = self.default_policy.get_n_comm(node.s) * self.n_comm_back_prop_ratio
 
         if node.count == 0:
             node.count = 1
@@ -338,6 +347,8 @@ class MCTSPolicy(object):
 
             # check trajectory
             tf, flag_goal_reached = self.check_traj(t, traj)
+            if tf <= 1:
+                return None
 
             if flag_goal_reached:
                 traj_node = MCTSTrajNode(alp_d, (t[:tf], traj[:tf]))
@@ -368,6 +379,12 @@ class MCTSPolicy(object):
         node = self.root_no_comm
         action_node = self.root_no_comm.children[0]
         traj_node = self.select_traj_no_comm(node, action_node)
+
+        if traj_node is None:
+            action_node.value += self.value_obs
+            action_node.score = self.score_w_value * action_node.value + self.score_w_comm * action_node.n_comm
+            return False
+
         node = self.select_time(traj_node)
 
         while node.count > 0 and not node.goal_reached:
@@ -384,7 +401,11 @@ class MCTSPolicy(object):
         # instead of run real roll out, use value functions from offline policy
         t_curr = node.t
         v = self.default_policy.get_value_func(node.s)
-        n_comm = self.default_policy.get_n_comm(node.s) * self.n_comm_back_prop_ratio
+
+        if node.goal_reached:
+            n_comm = 0.0
+        else:
+            n_comm = self.default_policy.get_n_comm(node.s) * self.n_comm_back_prop_ratio
 
         if node.count == 0:
             node.count = 1
@@ -413,7 +434,7 @@ class MCTSPolicy(object):
 
         return flag_new_node
 
-    def generate_policy(self, s_init, t_max=0.8):
+    def generate_policy(self, s_init, t_max=0.8, res_q=None):
         start_time = time.time()
 
         # construct a root
@@ -431,10 +452,13 @@ class MCTSPolicy(object):
             counter += 1
             t = time.time() - start_time
 
+        if res_q is not None:
+            res_q.put(self.get_policy())
+
         with self.print_lock:
             print "With Comm: has grown tree ", counter, " times"
 
-    def generate_policy_no_comm(self, s_init, b_init, t_max=0.8):
+    def generate_policy_no_comm(self, s_init, b_init, t_max=0.8, res_q=None):
         start_time = time.time()
 
         # create a root node and a fake action?
@@ -455,8 +479,36 @@ class MCTSPolicy(object):
             counter += 1
             t = time.time() - start_time
 
+        if res_q is not None:
+            res_q.put(self.get_policy_no_comm())
+
         with self.print_lock:
             print "No Comm: has grown tree ", counter, " times"
+
+    def generate_policy_parallel(self, s_init, b_init, t_max=0.5):
+        result_queue = multiprocessing.Queue()
+
+        # create two processes to run
+        thread_comm = multiprocessing.Process(target=self.generate_policy, args=[s_init, t_max-0.01, result_queue])
+        thread_no_comm = multiprocessing.Process(target=self.generate_policy_no_comm,
+                                                 args=[s_init, b_init, t_max-0.01, result_queue])
+
+        thread_comm.start()
+        thread_no_comm.start()
+
+        # wait for threads to finish
+        thread_comm.join()
+        thread_no_comm.join()
+
+        # get results
+        res1 = result_queue.get()
+        res2 = result_queue.get()
+
+        # no comm case only returns 1 value
+        if isinstance(res1, tuple):
+            return res1, res2
+        else:
+            return res2, res1
 
     def get_policy(self):
         a_opt = None
@@ -538,10 +590,10 @@ def policy_search_example(policy_path, modality, flag_no_comm=False):
     print "Goal is: ", mcts_policy.s_g
 
     # generate and visualize tree
-    s_init = np.array([3.5, 0.5, 1.5])
+    s_init = np.array([3.5, 1.5, 1.2])
     if flag_no_comm:
-        b_init = (1.5, 0.1)
-        mcts_policy.generate_policy_no_comm(s_init, b_init, t_max=0.8)
+        b_init = (1.2, 0.1)
+        mcts_policy.generate_policy_no_comm(s_init, b_init, t_max=0.5)
 
         fig, ax = plt.subplots()
         mcts_policy.visualize_search_tree(mcts_policy.root_no_comm, ax)
@@ -555,7 +607,7 @@ def policy_search_example(policy_path, modality, flag_no_comm=False):
 
         plt.show()
     else:
-        mcts_policy.generate_policy(s_init, t_max=0.8)
+        mcts_policy.generate_policy(s_init, t_max=0.5)
 
         fig, ax = plt.subplots()
         mcts_policy.visualize_search_tree(mcts_policy.policy_tree_root, ax)
