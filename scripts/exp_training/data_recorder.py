@@ -22,6 +22,7 @@ class DataLogger(object):
         self.human_vel_hist = []
         self.cal_hist = []
         self.t_hist = []
+        self.comm_hist = []
 
         # queues to temporarily store data
         self.pos_queue = Queue.Queue(maxsize=20)
@@ -60,17 +61,25 @@ class DataLogger(object):
                 self.t_hist.append([self.t_meas - t_start])
                 self.human_pose_hist.append(self.human_pose.copy())
 
-    def save_data(self, file_name=""):
+    def log_comm(self, t_comm, comm):
+        self.comm_hist.append([t_comm, comm])
+
+    def save_data(self, file_name="", flag_save_comm=False):
         if self.flag_log_to_file:
             self.save_file.close()
         else:
             data = np.hstack((np.asarray(self.t_hist), np.asarray(self.human_pose_hist)))
-            np.savetxt(self.save_path + "/" + file_name, data, fmt="%.3f", delimiter=", ")
+            if flag_save_comm:
+                np.savetxt(self.save_path + "/" + file_name + ".txt", data, fmt="%.3f", delimiter=", ")
+                np.savetxt(self.save_path + "/" + file_name + "_comm.txt", data, fmt="%.3f", delimiter=", ")
+            else:
+                np.savetxt(self.save_path + "/" + file_name, data, fmt="%.3f", delimiter=", ")
 
     def reset(self):
         self.human_pose_hist = []
         self.human_vel_hist = []
         self.t_hist = []
+        self.comm_hist = []
         with self.pos_queue.mutex:
             self.pos_queue.queue.clear()
         with self.rot_queue.mutex:

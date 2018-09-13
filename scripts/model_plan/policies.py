@@ -541,21 +541,21 @@ def mkdir_p(mypath):
 
 if __name__ == "__main__":
     # simulate_naive_policy(30, np.array([3.0, 2.0, 0.0]), "haptic")
-    validate_MDP_policy("/home/yuhang/Documents/proactive_guidance/training_data/user0",
-                        flag_with_obs=True, flag_plan=True)
+    # validate_MDP_policy("/home/yuhang/Documents/proactive_guidance/training_data/user0",
+    #                     flag_with_obs=True, flag_plan=True)
 
-    # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
+    # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_7targets.txt",
     #                         "../../resources/pretrained_models",
     #                         "haptic")
     #
-    # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
+    # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_7targets.txt",
     #                         "../../resources/pretrained_models",
     #                         "audio")
 
-    # generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
-    #                       "../../resources/pretrained_models",
-    #                       "haptic")
-    #
-    # generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_2targets.txt",
-    #                       "../../resources/pretrained_models",
-    #                       "audio")
+    generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_7targets.txt",
+                          "../../resources/pretrained_models",
+                          "haptic")
+
+    generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_7targets.txt",
+                          "../../resources/pretrained_models",
+                          "audio")
