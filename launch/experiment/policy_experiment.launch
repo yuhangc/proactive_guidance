@@ -10,7 +10,7 @@
                value="$(find proactive_guidance)/resources/pretrained_models/$(arg policy)_$(arg modality)/free_space" />
         <param name="modality" value="$(arg modality)" />
         <param name="protocol_file"
-               value="$(find proactive_guidance)/resources/protocols/free_space_exp_protocol_2targets.txt"/>
+               value="$(find proactive_guidance)/resources/protocols/free_space_exp_protocol_7targets.txt"/>
         <param name="path_saving" value="$(env HOME)/Documents/proactive_guidance/test_free_space/$(arg exp_id)"/>
 		<param name="mode" value="$(arg mode)" />
         <rosparam command="load" file="$(find proactive_guidance)/resources/exp_settings/$(arg modality).yaml" />

@@ -71,7 +71,7 @@ class DataLogger(object):
             data = np.hstack((np.asarray(self.t_hist), np.asarray(self.human_pose_hist)))
             if flag_save_comm:
                 np.savetxt(self.save_path + "/" + file_name + ".txt", data, fmt="%.3f", delimiter=", ")
-                np.savetxt(self.save_path + "/" + file_name + "_comm.txt", data, fmt="%.3f", delimiter=", ")
+                np.savetxt(self.save_path + "/" + file_name + "_comm.txt", np.asarray(self.comm_hist), fmt="%.3f", delimiter=", ")
             else:
                 np.savetxt(self.save_path + "/" + file_name, data, fmt="%.3f", delimiter=", ")
 

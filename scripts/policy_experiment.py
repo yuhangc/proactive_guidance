@@ -105,6 +105,9 @@ class PolicyExperiment(object):
 
     def check_for_stop(self, s):
         err = np.linalg.norm(s[:2] - self.proto_data[self.trial, 2:4])
+        print "human pose is: ", s, "\r"
+        print self.proto_data[self.trial, 2:4], "\r"
+        print "err is: ", err, "\r"
 
         if err < self.goal_reaching_th:
             # send a stop command
@@ -174,8 +177,6 @@ class PolicyExperiment(object):
                 if rospy.get_time() - t_last >= self.planner_dt:
                     # get latest tracking
                     pose = self.logger.get_pose()
-                    print "human pose is: ", pose, "\r"
-                    print self.planner.s_g, "\r"
 
                     # first check for stop
                     if self.check_for_stop(pose):
@@ -201,7 +202,7 @@ class PolicyExperiment(object):
                         self.publish_haptic_control([self.convert_feedback(cmd), 2])
 
                         # log the feedback
-                        self.logger.log_comm(rospy.get_time() - self.t_trial_start)
+                        self.logger.log_comm(rospy.get_time() - self.t_trial_start, cmd)
 
                     t_last = rospy.get_time()
 

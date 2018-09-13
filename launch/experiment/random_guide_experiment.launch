@@ -1,0 +1,9 @@
+<launch>
+	<arg name="mode" default="manual" />
+	<arg name="exp_id" default="test0" />
+
+    <node name="random_guide_experiment" pkg="proactive_guidance" type="random_guidance_exp.py" output="screen">
+        <param name="path_saving" value="$(env HOME)/Documents/proactive_guidance/training_data/$(arg exp_id)"/>
+		<param name="mode" value="$(arg mode)" />
+    </node>
+</launch>

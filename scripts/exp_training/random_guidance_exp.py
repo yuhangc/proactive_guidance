@@ -93,7 +93,7 @@ class RandomGuidanceExp(object):
         print "Experiment terminated...\r"
 
     def check_for_stop(self, s):
-        err = np.linalg.norm(s[:2] - self.s_g)
+        err = np.linalg.norm(s[:2] - self.s_g[:2])
 
         if err < self.goal_reaching_th:
             # send a stop command

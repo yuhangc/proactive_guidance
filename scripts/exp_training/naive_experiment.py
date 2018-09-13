@@ -26,6 +26,11 @@ class NaiveExperimentBase(object):
         # create a data logger
         path_saving = rospy.get_param("~path_saving", ".")
         self.logger = DataLogger(path_saving, False)
+        
+        self.robot_pose = rospy.get_param("~robot_pose", [0.0, 1.0, np.pi * 0.5])
+        self.x_range = rospy.get_param("~x_range", [-5.0, 5.0])
+        self.y_range = rospy.get_param("~y_range", [-1.0, 6.0])
+        self.logger.load_env_config(self.robot_pose, [self.x_range, self.y_range])
 
         self.t_start = 0.0
         self.flag_start_trial = False
