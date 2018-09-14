@@ -84,7 +84,8 @@ def generate_free_space_protocol2(file_name):
     # target directions, magnitudes and repetitions
     target_dirs = np.deg2rad(np.array([0, 15.0, -15.0, 30.0, -30.0, 45.0, -45.0]))
     target_mag = np.array([4.5, 4.5, 4.5, 4.0, 4.0, 3.5, 3.5])
-    target_rep = np.array([3, 3, 3, 3, 3, 3, 3])
+    # target_rep = np.array([3, 3, 3, 3, 3, 3, 3])
+    target_rep = np.array([1, 1, 1, 1, 1, 1, 1])
 
     targets = []
 
@@ -113,5 +114,5 @@ if __name__ == "__main__":
     # generate_naive_random_policy("random_protocol.txt", 5, 8, 3)
     # generate_naive_continuous_random_protocol("random_continuous_protocol_10rep2.txt", 24, 10, 2)
     # generate_free_space_protocol("free_space_exp_protocol_2targets.txt", 5, 2)
-    generate_free_space_protocol2("free_space_exp_protocol_7targets_mixed.txt")
+    generate_free_space_protocol2("free_space_exp_protocol_7targets_mixed_train.txt")
 

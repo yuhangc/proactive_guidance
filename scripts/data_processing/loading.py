@@ -133,6 +133,44 @@ def load_free_space_test(root_path, protocol_file):
     plt.show()
 
 
+def load_free_space_test_mixed(root_path, protocol_file):
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+
+    n_trial = len(protocol_data)
+
+    pose_all_mpd = []
+    pose_all_naive = []
+    for trial in range(n_trial):
+        data = np.loadtxt(root_path + "/trial" + str(trial) + ".txt", delimiter=", ")
+        if protocol_data[trial, 1] == 0:
+            pose_all_naive.append(data[:, 1:])
+        else:
+            pose_all_mpd.append(data[:, 1:])
+
+    # visualize
+    # generate a color map
+    n_colors = int(np.max(protocol_data[:, 0]))
+    cm = plt.get_cmap("gist_rainbow")
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    i_naive = 0
+    i_mdp = 0
+    for trial in range(n_trial):
+        if protocol_data[trial, 1] == 0:
+            traj = pose_all_naive[i_naive]
+            i_naive += 1
+            axes[0].plot(traj[:, 0], traj[:, 1], color=cm(1. * protocol_data[trial, 0] / n_colors))
+        else:
+            traj = pose_all_mpd[i_mdp]
+            i_mdp += 1
+            axes[1].plot(traj[:, 0], traj[:, 1], color=cm(1. * protocol_data[trial, 0] / n_colors))
+
+    axes[0].axis("equal")
+    axes[1].axis("equal")
+
+    plt.show()
+
+
 if __name__ == "__main__":
     # load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/test1-0830",
     #               "../../resources/protocols/random_continuous_protocol_10rep2.txt",
@@ -145,4 +183,7 @@ if __name__ == "__main__":
     # load_free_space_test("/home/yuhang/Documents/proactive_guidance/test_free_space/user0-0912/mdp",
     #                      "../../resources/protocols/free_space_exp_protocol_7targets.txt")
 
-    load_random_guidance_exp("/home/yuhang/Documents/proactive_guidance/training_data/user0/random_guidance", 30)
+    load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/test_free_space/user0-0912/mixed",
+                               "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+
+    # load_random_guidance_exp("/home/yuhang/Documents/proactive_guidance/training_data/user0/random_guidance", 30)

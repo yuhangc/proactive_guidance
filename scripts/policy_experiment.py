@@ -184,10 +184,11 @@ class PolicyExperiment(object):
         self.t_reset_start = rospy.get_time()
 
         while not rospy.is_shutdown() and not self.flag_end_program:
-            if self.state == "Running":# get latest tracking
+            if self.state == "Running":
                 # log data every loop
                 self.logger.log(self.t_trial_start)
-                
+
+                # get latest tracking
                 pose = self.logger.get_pose()
 
                 # first check for stop
