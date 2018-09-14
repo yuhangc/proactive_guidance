@@ -77,6 +77,35 @@ def load_save_all(root_path, protocol_file, n_trial, offsets=None, flag_transfor
         pickle.dump((t_all, pose_all, protocol_data), f)
 
 
+def load_random_guidance_exp(root_path, n_trials):
+    t_all = []
+    pose_all = []
+    comm_all = []
+
+    for trial in range(n_trials):
+        # load data
+        data = np.loadtxt(root_path + "/trial" + str(trial) + ".txt", delimiter=", ")
+        t_all.append(data[:, 0])
+
+        pose = data[:, 1:]
+        pose[:, 2] = wrap_to_pi(np.deg2rad(pose[:, 2]))
+        pose_all.append(transform_to_body(pose))
+
+        data = np.loadtxt(root_path + "/trial" + str(trial) + "_comm.txt", delimiter=", ")
+        comm_all.append(data)
+
+    # save to root path
+    with open(root_path + "/raw_random_guidance.pkl", "w") as f:
+        pickle.dump((t_all, pose_all, comm_all), f)
+
+    # some visualization to make sure things make sense
+    fig, ax = plt.subplots()
+    for pose in pose_all:
+        ax.plot(pose[:, 0], pose[:, 1])
+
+    plt.show()
+
+
 def load_free_space_test(root_path, protocol_file):
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 
@@ -113,5 +142,7 @@ if __name__ == "__main__":
     #               "../../resources/protocols/random_continuous_protocol_5rep2.txt",
     #               120, (2.13, 3.0, -np.pi * 0.75, np.pi))
 
-    load_free_space_test("/home/yuhang/Documents/proactive_guidance/test_free_space/user0/naive",
-                         "../../resources/protocols/free_space_exp_protocol_2targets.txt")
+    # load_free_space_test("/home/yuhang/Documents/proactive_guidance/test_free_space/user0-0912/mdp",
+    #                      "../../resources/protocols/free_space_exp_protocol_7targets.txt")
+
+    load_random_guidance_exp("/home/yuhang/Documents/proactive_guidance/training_data/user0/random_guidance", 30)

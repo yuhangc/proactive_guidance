@@ -84,7 +84,7 @@ def generate_free_space_protocol2(file_name):
     # target directions, magnitudes and repetitions
     target_dirs = np.deg2rad(np.array([0, 15.0, -15.0, 30.0, -30.0, 45.0, -45.0]))
     target_mag = np.array([4.5, 4.5, 4.5, 4.0, 4.0, 3.5, 3.5])
-    target_rep = np.array([3, 3, 3, 6, 6, 3, 3])
+    target_rep = np.array([3, 3, 3, 3, 3, 3, 3])
 
     targets = []
 
@@ -97,7 +97,10 @@ def generate_free_space_protocol2(file_name):
         trial_data[2:] = np.array([np.cos(ang), np.sin(ang)]) * target_mag[i] + start_pose[:2] - robot_pose[:2]
 
         for k in range(target_rep[i]):
-            targets.append(trial_data)
+            trial_data[1] = 0
+            targets.append(trial_data.copy())
+            trial_data[1] = 1
+            targets.append(trial_data.copy())
 
     # randomly shuffle targets
     targets = np.asarray(targets)
@@ -110,5 +113,5 @@ if __name__ == "__main__":
     # generate_naive_random_policy("random_protocol.txt", 5, 8, 3)
     # generate_naive_continuous_random_protocol("random_continuous_protocol_10rep2.txt", 24, 10, 2)
     # generate_free_space_protocol("free_space_exp_protocol_2targets.txt", 5, 2)
-    generate_free_space_protocol2("free_space_exp_protocol_7targets.txt")
+    generate_free_space_protocol2("free_space_exp_protocol_7targets_mixed.txt")
 

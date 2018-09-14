@@ -105,6 +105,31 @@ def visualize_processes(root_path, usr, cond):
     plt.show()
 
 
+def pre_processing_random_guidance(root_path, usr, flag_visualize=True):
+    # first process the one-step case
+    # load the preprocessed data
+    path = root_path + "/user" + str(usr) + "/random_guidance"
+    data_file = path + "/raw.pkl"
+
+    with open(data_file, "w") as f:
+        t_all, pose_all, comm_all = pickle.load(f)
+
+    n_trial = len(pose_all)
+
+    dir_in = []
+    dir_out = []
+
+    for trial in range(n_trial):
+        # trajectories are in body frame
+        # divide into segments based on communication
+        t = t_all[trial]
+        pose = pose_all[trial]
+        comm = comm_all[trial]
+
+        # fix timing issue?
+        t -= t[0]
+
+
 if __name__ == "__main__":
     # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "one_step")
     # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "continuous")

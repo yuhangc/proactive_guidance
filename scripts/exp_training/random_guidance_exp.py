@@ -34,11 +34,13 @@ class RandomGuidanceExp(object):
         # create a data logger
         path_saving = rospy.get_param("~path_saving", ".")
         self.robot_pose = rospy.get_param("~robot_pose", [0.0, 1.0, np.pi * 0.5])
-        self.x_range = rospy.get_param("~x_range", [-5.0, 5.0])
-        self.y_range = rospy.get_param("~y_range", [-1.0, 6.0])
+        self.x_range = rospy.get_param("~x_range", [-4.5, 4.5])
+        self.y_range = rospy.get_param("~y_range", [-0.5, 5.0])
 
+        logger_x_range = [-5.0, 5.0]
+        logger_y_range = [-1.0, 6.0]
         self.logger = DataLogger(path_saving, False)
-        self.logger.load_env_config(self.robot_pose, [self.x_range, self.y_range])
+        self.logger.load_env_config(self.robot_pose, [logger_x_range, logger_y_range])
 
         # experiment mode
         self.mode = rospy.get_param("~mode", "manual")      # can be 'manual' or 'auto'
@@ -126,12 +128,23 @@ class RandomGuidanceExp(object):
         ang = np.arctan2(y - self.robot_pose[1], x - self.robot_pose[0])
         if ang >= np.pi * 0.75 or ang <= -np.pi * 0.75:
             return False
-        else:
-            return True
 
-    def start_trial(self):
-        self.flag_start_trial = False
+        # check with previous goal
+        xo = 0.5 * (self.x_range[0] + self.x_range[1])
+        yo = 0.5 * (self.y_range[0] + self.y_range[1])
 
+        if y < 0.5 and self.s_g[1] < 0.5:
+            if (x - xo) * (self.s_g[0] - xo) < 0:
+                return False
+
+        # should not be too close to each other?
+        d = np.linalg.norm(self.s_g - np.array([x, y]))
+        if d < 2.0:
+            return False
+
+        return True
+
+    def gen_goal(self):
         # randomly sample a goal
         x = np.random.uniform(self.x_range[0], self.x_range[1])
         y = np.random.uniform(self.y_range[0], self.y_range[1])
@@ -139,6 +152,14 @@ class RandomGuidanceExp(object):
         while not self.check_goal_pos(x, y):
             x = np.random.uniform(self.x_range[0], self.x_range[1])
             y = np.random.uniform(self.y_range[0], self.y_range[1])
+
+        return x, y
+
+    def start_trial(self):
+        self.flag_start_trial = False
+
+        # randomly sample a goal
+        x, y = self.gen_goal()
 
         self.s_g = np.array([x, y, 0.0])
 

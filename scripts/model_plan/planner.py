@@ -2,7 +2,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle, Circle
 
 import pickle
 import time
@@ -288,6 +288,9 @@ def validate_planner(policy_path, modality, rep, flag_naive_planner=False):
         rect = Rectangle((x, y), w, h)
         ax.add_patch(rect)
 
+    circ = Circle((s_g[0], s_g[1]), radius=0.5, facecolor='r', alpha=0.3)
+    ax.add_patch(circ)
+
     for traj, comm_states, a_opt in zip(traj_all, comm_states_all, a_opt_all):
         ax.plot(traj[:, 0], traj[:, 1])
         ax.scatter(comm_states[:, 0], comm_states[:, 1])
@@ -300,13 +303,14 @@ def validate_planner(policy_path, modality, rep, flag_naive_planner=False):
 
         for i in range(n):
             ax.arrow(comm_states[i, 0], comm_states[i, 1], dx[i], dy[i])
+        ax.axis("equal")
 
     plt.show()
 
 
 if __name__ == "__main__":
-    validate_planner("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
-                     "haptic", 1)
-
     # validate_planner("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
-    #                  "haptic", 1, True)
+    #                  "haptic", 1)
+
+    validate_planner("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
+                     "haptic", 1, True)
