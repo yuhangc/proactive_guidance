@@ -39,7 +39,7 @@ class DataLogger(object):
         self.robot_pose = np.zeros((3, ))
 
         self.human_rot_inversion = -1.0
-        self.human_rot_offset = 188.0
+        self.human_rot_offset = 195.0
 
         # open file if in direct mode
         if self.flag_log_to_file:

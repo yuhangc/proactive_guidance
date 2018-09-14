@@ -184,41 +184,39 @@ class PolicyExperiment(object):
         self.t_reset_start = rospy.get_time()
 
         while not rospy.is_shutdown() and not self.flag_end_program:
-            if self.state == "Running":
-                if rospy.get_time() - t_last >= self.planner_dt:
-                    # get latest tracking
-                    pose = self.logger.get_pose()
-
-                    # first check for stop
-                    if self.check_for_stop(pose):
-                        print "Trial ", self.trial, " ended\r"
-
-                        # save data first
-                        self.logger.save_data(file_name="trial{}".format(self.trial), flag_save_comm=True)
-
-                        # check if exp ends
-                        self.trial += 1
-                        if self.trial >= len(self.proto_data):
-                            print "All trials finished!\r"
-                            break
-
-                        # prepare to reset
-                        self.t_reset_start = rospy.get_time()
-                        self.state = "Resetting"
-                    else:
-                        # compute and send policy
-                        cmd = self.planner.sample_policy(pose)
-
-                        # convert to right format and publish
-                        self.publish_haptic_control([self.convert_feedback(cmd), 2])
-
-                        # log the feedback
-                        self.logger.log_comm(rospy.get_time() - self.t_trial_start, cmd)
-
-                    t_last = rospy.get_time()
-
+            if self.state == "Running":# get latest tracking
                 # log data every loop
                 self.logger.log(self.t_trial_start)
+                
+                pose = self.logger.get_pose()
+
+                # first check for stop
+                if self.check_for_stop(pose):
+                    print "Trial ", self.trial, " ended\r"
+
+                    # save data first
+                    self.logger.save_data(file_name="trial{}".format(self.trial), flag_save_comm=True)
+
+                    # check if exp ends
+                    self.trial += 1
+                    if self.trial >= len(self.proto_data):
+                        print "All trials finished!\r"
+                        break
+
+                    # prepare to reset
+                    self.t_reset_start = rospy.get_time()
+                    self.state = "Resetting"
+                elif rospy.get_time() - t_last >= self.planner_dt:
+                    # compute and send policy
+                    cmd = self.planner.sample_policy(pose)
+
+                    # convert to right format and publish
+                    self.publish_haptic_control([self.convert_feedback(cmd), 2])
+
+                    # log the feedback
+                    self.logger.log_comm(rospy.get_time() - self.t_trial_start, cmd)
+
+                    t_last = rospy.get_time()
 
             elif self.state == "Resetting":
                 # wait for some time or user input to start the next trial
