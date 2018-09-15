@@ -251,7 +251,7 @@ def validate_planner(policy_path, modality, rep, flag_naive_planner=False, flag_
                                                                             flag_return_alp=True)
                 t_traj += t
 
-                print "action is: ", a_opt, "reaction is: ", alp_d
+                print "action is: ", a_opt, "reaction is: ", alp_d-s[2]
 
                 t_list.append(t_traj[1])
                 traj_list.append(traj[1].copy())
