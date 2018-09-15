@@ -41,7 +41,7 @@ class Planner(object):
         self.om_smooth_factor = 0.5
 
         self.cov_m_base = 0.3**2
-        self.cov_m_k = 0.3**2 - 0.05**2
+        self.cov_m_k = (0.3**2 - 0.05**2) / 0.5
 
     def create_policy(self, default_policy, modality):
         self.mcts_policy = MCTSPolicy(default_policy.tmodel, default_policy, modality)
@@ -212,8 +212,8 @@ def validate_planner(policy_path, modality, rep, flag_naive_planner=False, flag_
         planner.reset()
 
         t = 0.0
-        s = np.array([0.5, 0.5, 0.0])
-        # s = np.array([-1.0, 2.0, 0.0])
+        # s = np.array([0.5, 1.5, 1.5])
+        s = np.array([-1.0, 2.0, 0.0])
 
         t_list = [0.0]
         traj_list = [s.copy()]
@@ -241,14 +241,17 @@ def validate_planner(policy_path, modality, rep, flag_naive_planner=False, flag_
             if a_opt is None:
                 pass
             else:
-                print "action is: ", a_opt
-
                 comm_states.append(s.copy())
                 a_opt_list.append(a_opt)
 
                 human_model.set_state(s[0], s[1], s[2])
-                t_traj, traj = human_model.sample_traj_single_action((modality, a_opt), traj_sample_dt, traj_sample_T)
+                alp_d, t_traj, traj = human_model.sample_traj_single_action((modality, a_opt),
+                                                                            traj_sample_dt,
+                                                                            traj_sample_T,
+                                                                            flag_return_alp=True)
                 t_traj += t
+
+                print "action is: ", a_opt, "reaction is: ", alp_d
 
                 t_list.append(t_traj[1])
                 traj_list.append(traj[1].copy())
@@ -311,11 +314,11 @@ def validate_planner(policy_path, modality, rep, flag_naive_planner=False, flag_
 
 
 if __name__ == "__main__":
-    validate_planner("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
-                     "haptic", 1)
+    # validate_planner("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
+    #                  "haptic", 1)
 
-    # validate_planner("../../resources/pretrained_models/mdp_haptic/free_space/target3.pkl",
-    #                  "haptic", 1, flag_with_obs=False, flag_naive_planner=True)
+    validate_planner("../../resources/pretrained_models/mdp_haptic/free_space/target3.pkl",
+                     "haptic", 1, flag_with_obs=False, flag_naive_planner=False)
 
     # validate_planner("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
     #                  "haptic", 1, True)

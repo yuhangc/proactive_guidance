@@ -93,11 +93,11 @@ class MCTSPolicy(object):
 
         self.uct_weight = 1
 
-        self.traj_sample_dt = 0.25
+        self.traj_sample_dt = 0.5
         self.traj_sample_T = 5.0
 
         self.time_sample_factor1 = 6.0
-        self.time_sample_factor2 = -2.0
+        self.time_sample_factor2 = -1.5
 
         self.gamma = 0.95
         self.gamma_scale = 0.5
@@ -185,9 +185,17 @@ class MCTSPolicy(object):
         n = len(action_node.children)
         if np.power(action_node.count, self.traj_widen_factor) > n:
             self.model.set_state(action_node.s[0], action_node.s[1], action_node.s[2])
+
+            # try adaptive time step
+            n_comm = self.default_policy.get_n_comm(action_node.s)
+            if n_comm < 4.0:
+                sample_dt = 0.5 * self.traj_sample_dt
+            else:
+                sample_dt = self.traj_sample_dt
+
             try:
                 alp_d, t, traj = self.model.sample_traj_single_action((self.modality, action_node.a),
-                                                                      self.traj_sample_dt,
+                                                                      sample_dt,
                                                                       self.traj_sample_T,
                                                                       flag_return_alp=True)
             except:
@@ -224,7 +232,7 @@ class MCTSPolicy(object):
 
         return traj_node
 
-    def sample_time(self, traj_node, flag_new_node):
+    def sample_time(self, traj_node, flag_new_node, ts=1, f1=None, f2=None):
         elm = []
         chances = []
 
@@ -232,7 +240,7 @@ class MCTSPolicy(object):
             print "something is wrong"
         v0 = self.default_policy.get_value_func(traj_node.traj[1][0])
 
-        for i in range(1, len(traj_node.traj[0])):
+        for i in range(ts, len(traj_node.traj[0])):
             if (traj_node.selected[i] > 0) ^ flag_new_node:
                 s = np.array([traj_node.traj[1][i, 0], traj_node.traj[1][i, 1], traj_node.alp_d])
                 v = self.default_policy.get_value_func(s)
@@ -240,8 +248,11 @@ class MCTSPolicy(object):
                 # alp_diff = wrap_to_pi(traj_node.alp_d - alp_d)
 
                 t = traj_node.traj[0][i] - traj_node.traj[0][0]
-                val = self.time_sample_factor1 * (v * self.gamma**(t * self.gamma_scale) - v0) +\
-                      self.time_sample_factor2 * alp_d**2
+                if f1 is None:
+                    f1 = self.time_sample_factor1
+                    f2 = self.time_sample_factor2
+
+                val = f1 * (v * self.gamma**(t * self.gamma_scale) - v0) + f2 * alp_d**2
 
                 elm.append(i)
                 chances.append(np.exp(val))
@@ -257,7 +268,7 @@ class MCTSPolicy(object):
                 print "this shouldn't happen"
             return np.random.choice(np.arange(len(traj_node.children)), p=chances)
 
-    def select_time(self, traj_node):
+    def select_time(self, traj_node, ts=1, f1=None, f2=None):
         traj_node.count += 1
 
         n = len(traj_node.children)
@@ -276,14 +287,14 @@ class MCTSPolicy(object):
                 return state_node
         else:
             if np.power(traj_node.count, self.time_widen_factor) > n and \
-                            len(traj_node.children) < len(traj_node.traj[0])-1:
-                i = self.sample_time(traj_node, True)
+                            len(traj_node.children) < len(traj_node.traj[0])-ts:
+                i = self.sample_time(traj_node, True, ts, f1, f2)
                 traj_node.selected[i] = 1
                 state_node = MCTSStateNode(traj_node.traj[1][i], (traj_node.alp_d, 0.0), traj_node.traj[0][i])
                 state_node.parent = traj_node
                 traj_node.children.append(state_node)
             else:
-                i = self.sample_time(traj_node, False)
+                i = self.sample_time(traj_node, False, ts, f1, f2)
                 state_node = traj_node.children[i]
 
         return state_node
@@ -353,7 +364,7 @@ class MCTSPolicy(object):
 
             # check trajectory
             tf, flag_goal_reached = self.check_traj(t, traj)
-            if tf <= 1:
+            if tf <= 2:
                 return None
 
             if flag_goal_reached:
@@ -391,7 +402,7 @@ class MCTSPolicy(object):
             action_node.score = self.score_w_value * action_node.value + self.score_w_comm * action_node.n_comm
             return False
 
-        node = self.select_time(traj_node)
+        node = self.select_time(traj_node, ts=2, f1=8.0, f2=-1.0)
 
         while node.count > 0 and not node.goal_reached:
             a_node = self.select_action(node)
@@ -531,7 +542,7 @@ class MCTSPolicy(object):
         v = self.root_no_comm.children[0].score / self.root_no_comm.children[0].count
         return v
 
-    def visualize_search_tree(self, node, ax):
+    def visualize_search_tree(self, node, ax, d, d_max=None):
         if node.type == "state":
             # plot a point
             if node.goal_reached:
@@ -544,9 +555,12 @@ class MCTSPolicy(object):
         elif node.type == "traj":
             ax.plot(node.traj[1][:, 0], node.traj[1][:, 1])
 
+        if d_max is not None and d >= d_max:
+            return
+
         if node.children:
             for child in node.children:
-                self.visualize_search_tree(child, ax)
+                self.visualize_search_tree(child, ax, d+1, d_max)
 
     def visualize_best_path(self, node, ax):
         # plot a point
@@ -597,13 +611,13 @@ def policy_search_example(policy_path, modality, flag_no_comm=False):
     print "Goal is: ", mcts_policy.s_g
 
     # generate and visualize tree
-    s_init = np.array([3.934, 2.119, 1.516])
+    s_init = np.array([0.59, 2.00, 1.36])
     if flag_no_comm:
-        b_init = (1.516, 0.2)
-        mcts_policy.generate_policy_no_comm(s_init, b_init, t_max=0.5)
+        b_init = (1.36, 0.1)
+        mcts_policy.generate_policy_no_comm(s_init, b_init, t_max=0.6)
 
         fig, ax = plt.subplots()
-        mcts_policy.visualize_search_tree(mcts_policy.root_no_comm, ax)
+        mcts_policy.visualize_search_tree(mcts_policy.root_no_comm, ax, 0, 4)
         ax.axis("equal")
 
         plt.show()
@@ -614,10 +628,10 @@ def policy_search_example(policy_path, modality, flag_no_comm=False):
 
         plt.show()
     else:
-        mcts_policy.generate_policy(s_init, t_max=0.5)
+        mcts_policy.generate_policy(s_init, t_max=0.6)
 
         fig, ax = plt.subplots()
-        mcts_policy.visualize_search_tree(mcts_policy.policy_tree_root, ax)
+        mcts_policy.visualize_search_tree(mcts_policy.policy_tree_root, ax, 0, 4)
         ax.axis("equal")
 
         plt.show()
