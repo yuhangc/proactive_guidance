@@ -77,7 +77,7 @@ class MCTSPolicy(object):
         self.x_range = self.default_policy.x_range
         self.y_range = self.default_policy.y_range
 
-        self.goal_reaching_th = 0.35
+        self.goal_reaching_th = 0.3
 
         # obstacle
         # TODO: how to handle?
@@ -93,7 +93,7 @@ class MCTSPolicy(object):
 
         self.uct_weight = 1
 
-        self.traj_sample_dt = 0.5
+        self.traj_sample_dt = 0.25
         self.traj_sample_T = 5.0
 
         self.time_sample_factor1 = 6.0
@@ -110,6 +110,7 @@ class MCTSPolicy(object):
         self.no_new_node_th = 200
 
         self.value_obs = -100.0
+        self.value_goal = 10.0
 
         # print lock
         self.print_lock = threading.Lock()
@@ -198,6 +199,8 @@ class MCTSPolicy(object):
             tf, flag_goal_reached = self.check_traj(t, traj)
 
             if flag_goal_reached:
+                if tf <= 2:
+                    print "this shouldn't happen"
                 traj_node = MCTSTrajNode(alp_d, (t[2:tf], traj[2:tf]))
                 traj_node.goal_reached = True
                 traj_node.parent = action_node
@@ -264,6 +267,8 @@ class MCTSPolicy(object):
             if n > 0:
                 return traj_node.children[0]
             else:
+                if len(traj_node.traj) == 0 or len(traj_node.traj[0]) == 0:
+                    print "this is wrong"
                 state_node = MCTSStateNode(traj_node.traj[1][-1], (traj_node.alp_d, 0.0), traj_node.traj[0][-1])
                 state_node.goal_reached = True
                 state_node.parent = traj_node
@@ -299,12 +304,13 @@ class MCTSPolicy(object):
 
         # instead of run real roll out, use value functions from offline policy
         t_curr = node.t
-        v = self.default_policy.get_value_func(node.s)
 
         if node.goal_reached:
             n_comm = 0.0
+            v = self.value_goal
         else:
             n_comm = self.default_policy.get_n_comm(node.s) * self.n_comm_back_prop_ratio
+            v = self.default_policy.get_value_func(node.s)
 
         if node.count == 0:
             node.count = 1
@@ -400,12 +406,13 @@ class MCTSPolicy(object):
 
         # instead of run real roll out, use value functions from offline policy
         t_curr = node.t
-        v = self.default_policy.get_value_func(node.s)
 
         if node.goal_reached:
             n_comm = 0.0
+            v = self.value_goal
         else:
             n_comm = self.default_policy.get_n_comm(node.s) * self.n_comm_back_prop_ratio
+            v = self.default_policy.get_value_func(node.s)
 
         if node.count == 0:
             node.count = 1
@@ -590,9 +597,9 @@ def policy_search_example(policy_path, modality, flag_no_comm=False):
     print "Goal is: ", mcts_policy.s_g
 
     # generate and visualize tree
-    s_init = np.array([3.5, 1.5, 1.2])
+    s_init = np.array([3.934, 2.119, 1.516])
     if flag_no_comm:
-        b_init = (1.2, 0.1)
+        b_init = (1.516, 0.2)
         mcts_policy.generate_policy_no_comm(s_init, b_init, t_max=0.5)
 
         fig, ax = plt.subplots()
@@ -624,4 +631,7 @@ def policy_search_example(policy_path, modality, flag_no_comm=False):
 
 if __name__ == "__main__":
     policy_search_example("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
-                          "haptic", flag_no_comm=False)
+                          "haptic", flag_no_comm=True)
+
+    # policy_search_example("../../resources/pretrained_models/mdp_haptic/free_space/target3.pkl",
+    #                       "haptic", flag_no_comm=True)

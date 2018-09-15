@@ -12,7 +12,7 @@ def wrap_to_pi(ang):
 def pre_processing(root_path, usr, cond, flag_visualize=True):
     # first process the one-step case
     # load the preprocessed data
-    path = root_path + "/user" + str(usr) + "/" + cond
+    path = root_path + "/" + usr + "/" + cond
     data_file = path + "/raw_transformed.pkl"
 
     with open(data_file) as f:
@@ -44,6 +44,12 @@ def pre_processing(root_path, usr, cond, flag_visualize=True):
 
     # create 2 different plots
     if flag_visualize:
+        # plot all traj
+        fig, ax = plt.subplots()
+        for pose in pose_all:
+            ax.plot(pose[:, 0], pose[:, 1])
+        ax.axis("equal")
+
         fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 
         axes[0].scatter(np.rad2deg(dir_in), np.rad2deg(dir_out))
@@ -132,7 +138,7 @@ def pre_processing_random_guidance(root_path, usr, flag_visualize=True):
 
 if __name__ == "__main__":
     # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "one_step")
-    # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "continuous")
+    pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", "pilot0", "audio")
     # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "audio")
-    visualize_processes("/home/yuhang/Documents/proactive_guidance/training_data", 0, "continuous")
+    # visualize_processes("/home/yuhang/Documents/proactive_guidance/training_data", 0, "continuous")
 

@@ -178,7 +178,7 @@ class PlannerNaive(object):
         pass
 
 
-def validate_planner(policy_path, modality, rep, flag_naive_planner=False):
+def validate_planner(policy_path, modality, rep, flag_naive_planner=False, flag_with_obs=True):
     # create a planner
     if flag_naive_planner:
         planner = PlannerNaive()
@@ -198,7 +198,7 @@ def validate_planner(policy_path, modality, rep, flag_naive_planner=False):
     s_g = mdp_policy.s_g
     dt = 0.5
     T = 30.0
-    tol = 0.5
+    tol = 0.3
 
     traj_sample_dt = 0.5
     traj_sample_T = 10.0
@@ -213,6 +213,7 @@ def validate_planner(policy_path, modality, rep, flag_naive_planner=False):
 
         t = 0.0
         s = np.array([0.5, 0.5, 0.0])
+        # s = np.array([-1.0, 2.0, 0.0])
 
         t_list = [0.0]
         traj_list = [s.copy()]
@@ -281,14 +282,15 @@ def validate_planner(policy_path, modality, rep, flag_naive_planner=False):
     fig, ax = plt.subplots()
 
     # plot obstacles
-    obs_list = [(1.5, 2.00, 1.0, 1.25),
-                (2.0, 1.0, 1.25, 0.5)]
+    if flag_with_obs:
+        obs_list = [(1.5, 2.00, 1.0, 1.25),
+                    (2.0, 1.0, 1.25, 0.5)]
 
-    for x, y, w, h in obs_list:
-        rect = Rectangle((x, y), w, h)
-        ax.add_patch(rect)
+        for x, y, w, h in obs_list:
+            rect = Rectangle((x, y), w, h)
+            ax.add_patch(rect)
 
-    circ = Circle((s_g[0], s_g[1]), radius=0.5, facecolor='r', alpha=0.3)
+    circ = Circle((s_g[0], s_g[1]), radius=tol, facecolor='r', alpha=0.3)
     ax.add_patch(circ)
 
     for traj, comm_states, a_opt in zip(traj_all, comm_states_all, a_opt_all):
@@ -309,8 +311,11 @@ def validate_planner(policy_path, modality, rep, flag_naive_planner=False):
 
 
 if __name__ == "__main__":
-    # validate_planner("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
-    #                  "haptic", 1)
-
     validate_planner("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
-                     "haptic", 1, True)
+                     "haptic", 1)
+
+    # validate_planner("../../resources/pretrained_models/mdp_haptic/free_space/target3.pkl",
+    #                  "haptic", 1, flag_with_obs=False, flag_naive_planner=True)
+
+    # validate_planner("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
+    #                  "haptic", 1, True)

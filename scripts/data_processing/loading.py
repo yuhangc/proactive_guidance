@@ -10,24 +10,12 @@ def wrap_to_pi(ang):
     return (ang + np.pi) % (2 * np.pi) - np.pi
 
 
-def load_trial(root_path, trial_id, flag_transform=True, offsets=(2.13, 2.74, -2.3562, -1.5708)):
+def load_trial(root_path, trial_id):
     data = np.loadtxt(root_path + "/trial" + str(trial_id) + ".txt", delimiter=", ")
 
     t = data[:, 0]
     pose = data[:, 1:4]
     pose[:, 2] = wrap_to_pi(np.deg2rad(pose[:, 2]))
-
-    # optionally transform the coordinates
-    if flag_transform:
-        # positions
-        offset = np.array([offsets[0], offsets[1]])
-        th = offsets[2]
-
-        rot_mat = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
-        pose[:, 0:2] = np.dot(pose[:, 0:2], rot_mat.transpose()) + offset
-
-        # orientation
-        pose[:, 2] = wrap_to_pi(-pose[:, 2] + offsets[3])
 
     return t, pose
 
@@ -53,15 +41,15 @@ def transform_to_body(pose):
     return pose_trans
 
 
-def load_save_all(root_path, protocol_file, n_trial, offsets=None, flag_transform_to_body=True):
+def load_save_all(root_path, protocol_file, flag_transform_to_body=True):
     t_all = []
     pose_all =[]
 
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+    n_trial = len(protocol_data)
+
     for trial in range(n_trial):
-        if offsets is not None:
-            t, pose = load_trial(root_path, trial, flag_transform=True, offsets=offsets)
-        else:
-            t, pose = load_trial(root_path, trial, flag_transform=False)
+        t, pose = load_trial(root_path, trial)
 
         # optionally transform to body frame
         if flag_transform_to_body:
@@ -69,8 +57,6 @@ def load_save_all(root_path, protocol_file, n_trial, offsets=None, flag_transfor
 
         t_all.append(t)
         pose_all.append(pose)
-
-    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 
     # save to root path
     with open(root_path + "/raw_transformed.pkl", "w") as f:
@@ -176,14 +162,14 @@ if __name__ == "__main__":
     #               "../../resources/protocols/random_continuous_protocol_10rep2.txt",
     #               120, (2.13, 2.74, -np.pi * 0.75, -np.pi * 0.5))
 
-    # load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/user0/audio",
-    #               "../../resources/protocols/random_continuous_protocol_5rep2.txt",
-    #               120, (2.13, 3.0, -np.pi * 0.75, np.pi))
+    load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/pilot0/audio",
+                  "../../resources/protocols/random_continuous_protocol_5rep2.txt",
+                  flag_transform_to_body=True)
 
     # load_free_space_test("/home/yuhang/Documents/proactive_guidance/test_free_space/user0-0912/mdp",
     #                      "../../resources/protocols/free_space_exp_protocol_7targets.txt")
 
-    load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/test_free_space/user0-0912/mixed",
-                               "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+    # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/test_free_space/user0-0912/mixed",
+    #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
     # load_random_guidance_exp("/home/yuhang/Documents/proactive_guidance/training_data/user0/random_guidance", 30)
