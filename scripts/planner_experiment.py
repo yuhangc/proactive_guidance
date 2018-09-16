@@ -1,29 +1,48 @@
 #!/usr/bin/env python
+
+# import sys
+# sys.path.append("/home/yuhang/ros_dev/src/proactive_guidance/scripts/model_plan")
+
 import numpy as np
+import pickle
+import threading
 
 import rospy
 from std_msgs.msg import String
 from people_msgs.msg import PositionMeasurementArray
 
-import threading
+from model_plan.gp_model_approx import GPModelApproxBase
+from model_plan.movement_model import MovementModel
+from model_plan.policies import MDPFixedTimePolicy
+from model_plan.planner import Planner, PlannerNaive
+from exp_training.data_recorder import DataLogger
+from exp_training.utils import getKey
 
-from data_recorder import DataLogger
-from utils import getKey, wrap_to_pi
 
-
-class RandomGuidanceExp(object):
+class PolicyExperiment(object):
     def __init__(self):
         # read in configurations
+        # create planner
+        planner = rospy.get_param("~planner", "mcts")
+
+        if planner == "mcts":
+            self.planner = Planner()
+        else:
+            self.planner = PlannerNaive()
+
+        # directory that stores the policies for each trial
+        self.policy_dir = rospy.get_param("~planner_dir", "mdp_haptic")
+
         # feedback modality
         self.modality = rospy.get_param("~modality", "haptic")
+        self.policy = rospy.get_param("~policy", "mixed")
 
         # time interval to update plan
-        self.planner_dt = rospy.get_param("~planner_dt", 2.0)
+        self.planner_dt = rospy.get_param("~planner_dt", 1.0)
 
         # time interval for resetting/pausing
-        self.resetting_dt = rospy.get_param("~resetting_dt", 3.0)
+        self.resetting_dt = rospy.get_param("~resetting_dt", 10.0)
         self.resuming_dt = rospy.get_param("~resuming_dt", 5.0)
-        self.trial_dt = rospy.get_param("~trial_dt", 5.0)
         self.t_reset_start = 0.0
         self.t_resume_start = 0.0
         self.t_trial_start = 0.0
@@ -31,29 +50,23 @@ class RandomGuidanceExp(object):
         # goal reaching threshold
         self.goal_reaching_th = rospy.get_param("~goal_reaching_th", 0.3)
 
-        # discretization
-        self.dalp = rospy.get_param("~dalp", 15.0)
-
         # create a data logger
         path_saving = rospy.get_param("~path_saving", ".")
-        self.robot_pose = rospy.get_param("~robot_pose", [0.0, 1.0, np.pi * 0.5])
-        self.x_range = rospy.get_param("~x_range", [-4.5, 4.5])
-        self.y_range = rospy.get_param("~y_range", [-0.5, 5.0])
+        robot_pose = rospy.get_param("~robot_pose", [0.0, 1.0, np.pi * 0.5])
+        x_range = rospy.get_param("~x_range", [-5.0, 5.0])
+        y_range = rospy.get_param("~y_range", [-1.0, 6.0])
 
-        logger_x_range = [-5.0, 5.0]
-        logger_y_range = [-1.0, 6.0]
         self.logger = DataLogger(path_saving, False)
-        self.logger.load_env_config(self.robot_pose, [logger_x_range, logger_y_range])
+        self.logger.load_env_config(robot_pose, [x_range, y_range])
 
         # experiment mode
         self.mode = rospy.get_param("~mode", "manual")      # can be 'manual' or 'auto'
 
         # load protocol
-        self.n_trial_total = 60
-        self.trial = 0
+        protocol_file = rospy.get_param("~protocol_file", "protocol.txt")
+        self.proto_data = np.loadtxt(protocol_file, delimiter=", ")
 
-        # goal that is randomly sampled each time
-        self.s_g = np.zeros((3, ))
+        self.trial = 0
 
         # a stop command
         self.msg_stop = [270, 0]
@@ -98,7 +111,10 @@ class RandomGuidanceExp(object):
         print "Experiment terminated...\r"
 
     def check_for_stop(self, s):
-        err = np.linalg.norm(s[:2] - self.s_g[:2])
+        err = np.linalg.norm(s[:2] - self.proto_data[self.trial, 2:4])
+        # print "human pose is: ", s, "\r"
+        # print self.proto_data[self.trial, 2:4], "\r"
+        # print "err is: ", err, "\r"
 
         if err < self.goal_reaching_th:
             # send a stop command
@@ -118,50 +134,31 @@ class RandomGuidanceExp(object):
         if cmd < 0:
             cmd += 360
 
-        # round to discretized angles
-        cmd = int(np.round(cmd / self.dalp) * self.dalp)
+        # round to integer based on modality
+        if self.modality == "haptic":
+            cmd = int(np.round(cmd))
+        elif self.modality == "audio":
+            cmd = int(np.round(cmd / 5.0)) * 5
 
         return cmd
-
-    def check_goal_pos(self, x, y):
-        # check angle to robot
-        ang = np.arctan2(y - self.robot_pose[1], x - self.robot_pose[0])
-        if ang >= np.pi * 0.75 or ang <= -np.pi * 0.75:
-            return False
-
-        # check with previous goal
-        xo = 0.5 * (self.x_range[0] + self.x_range[1])
-        yo = 0.5 * (self.y_range[0] + self.y_range[1])
-
-        if y < 0.5 and self.s_g[1] < 0.5:
-            if (x - xo) * (self.s_g[0] - xo) < 0:
-                return False
-
-        # should not be too close to each other?
-        d = np.linalg.norm(self.s_g - np.array([x, y]))
-        if d < 2.0:
-            return False
-
-        return True
-
-    def gen_goal(self):
-        # randomly sample a goal
-        x = np.random.uniform(self.x_range[0], self.x_range[1])
-        y = np.random.uniform(self.y_range[0], self.y_range[1])
-
-        while not self.check_goal_pos(x, y):
-            x = np.random.uniform(self.x_range[0], self.x_range[1])
-            y = np.random.uniform(self.y_range[0], self.y_range[1])
-
-        return x, y
 
     def start_trial(self):
         self.flag_start_trial = False
 
-        # randomly sample a goal
-        x, y = self.gen_goal()
+        # load planner
+        target_id = int(self.proto_data[self.trial, 0])
 
-        self.s_g = np.array([x, y, 0.0])
+        if self.policy == "mixed":
+            policy_id = int(self.proto_data[self.trial, 1])
+            if policy_id == 0:
+                planner_dir = self.planner_dir + "/naive_" + self.modality + "/free_space"
+            else:
+                planner_dir = self.planner_dir + "/mdp_" + self.modality + "/free_space"
+        else:
+            planner_dir = self.planner_dir + "/" + self.policy + "_" + self.modality + "/free_space"
+
+        with open(planner_dir + "/target" + str(target_id) + ".pkl") as f:
+            self.planner = pickle.load(f)
 
         # reset data logger
         self.logger.reset()
@@ -194,10 +191,14 @@ class RandomGuidanceExp(object):
 
         while not rospy.is_shutdown() and not self.flag_end_program:
             if self.state == "Running":
-                # check for stop or trial end
+                # log data every loop
+                self.logger.log(self.t_trial_start)
+
+                # get latest tracking
                 pose = self.logger.get_pose()
 
-                if self.check_for_stop(pose) or rospy.get_time() - self.t_trial_start > self.trial_dt:
+                # first check for stop
+                if self.check_for_stop(pose):
                     print "Trial ", self.trial, " ended\r"
 
                     # save data first
@@ -205,29 +206,24 @@ class RandomGuidanceExp(object):
 
                     # check if exp ends
                     self.trial += 1
-                    if self.trial >= self.n_trial_total:
+                    if self.trial >= len(self.proto_data):
                         print "All trials finished!\r"
                         break
 
                     # prepare to reset
                     self.t_reset_start = rospy.get_time()
                     self.state = "Resetting"
-
-                if rospy.get_time() - t_last >= self.planner_dt:
-                    # compute and send feedback
-                    x_diff = self.s_g[:2] - pose[:2]
-                    cmd = wrap_to_pi(np.arctan2(x_diff[1], x_diff[0]) - pose[2])
+                elif rospy.get_time() - t_last >= self.planner_dt:
+                    # compute and send policy
+                    cmd = self.planner.sample_policy(pose)
 
                     # convert to right format and publish
                     self.publish_haptic_control([self.convert_feedback(cmd), 2])
 
-                    # log communication
+                    # log the feedback
                     self.logger.log_comm(rospy.get_time() - self.t_trial_start, cmd)
 
                     t_last = rospy.get_time()
-
-                # log data every loop
-                self.logger.log(self.t_trial_start)
 
             elif self.state == "Resetting":
                 # wait for some time or user input to start the next trial
@@ -265,9 +261,10 @@ class RandomGuidanceExp(object):
 
 
 if __name__ == "__main__":
-    rospy.init_node("random_guidance_exp")
+    rospy.init_node("policy_experiment")
 
     trial_start = rospy.get_param("~trial_start", 0)
 
-    exp = RandomGuidanceExp()
+    exp = PolicyExperiment()
     exp.run(trial_start)
+
