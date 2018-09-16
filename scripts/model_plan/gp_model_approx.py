@@ -9,7 +9,7 @@ from sklearn.gaussian_process.kernels import RBF, ExpSineSquared, WhiteKernel, C
 
 
 # utility function for outlier rejection
-def outlier_rejection(x, m=1.5):
+def outlier_rejection(x, m=2.0):
     return x[np.abs(x - np.mean(x)) < m * np.std(x)]
 
 
@@ -174,6 +174,10 @@ class GPModelApproxBase(object):
         else:
             self._visualize_process(0, axes, "feedback(rad)", "response data(rad)")
 
+        # plot the "perfect" response
+        x = [-np.pi, np.pi]
+        axes.plot(x, x, 'r')
+
         plt.show()
 
 
@@ -234,6 +238,6 @@ if __name__ == "__main__":
     # model_approx_one_step_example("/home/yuhang/Documents/proactive_guidance/training_data/user0", False)
     # model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user0",
     #                                 "continuous", False)
-    # model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user0",
-    #                                 "audio", False)
-    model_approx_create_interp_data("/home/yuhang/Documents/proactive_guidance/training_data/user0")
+    model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user1",
+                                    "haptic", True)
+    # model_approx_create_interp_data("/home/yuhang/Documents/proactive_guidance/training_data/user0")

@@ -162,9 +162,9 @@ if __name__ == "__main__":
     #               "../../resources/protocols/random_continuous_protocol_10rep2.txt",
     #               120, (2.13, 2.74, -np.pi * 0.75, -np.pi * 0.5))
 
-    load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/pilot0/audio",
+    load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/user1/haptic",
                   "../../resources/protocols/random_continuous_protocol_5rep2.txt",
-                  flag_transform_to_body=True)
+                  flag_transform_to_body=False)
 
     # load_free_space_test("/home/yuhang/Documents/proactive_guidance/test_free_space/user0-0912/mdp",
     #                      "../../resources/protocols/free_space_exp_protocol_7targets.txt")

@@ -35,7 +35,8 @@ class PolicyExperiment(object):
 
         # feedback modality
         self.modality = rospy.get_param("~modality", "haptic")
-        self.policy = rospy.get_param("~policy", "mixed")
+        self.default_policy = rospy.get_param("~policy", "mdp")
+        self.env = rospy.get_param("~env", "free_space")
 
         # time interval to update plan
         self.planner_dt = rospy.get_param("~planner_dt", 1.0)
@@ -148,17 +149,13 @@ class PolicyExperiment(object):
         # load planner
         target_id = int(self.proto_data[self.trial, 0])
 
-        if self.policy == "mixed":
-            policy_id = int(self.proto_data[self.trial, 1])
-            if policy_id == 0:
-                planner_dir = self.planner_dir + "/naive_" + self.modality + "/free_space"
-            else:
-                planner_dir = self.planner_dir + "/mdp_" + self.modality + "/free_space"
-        else:
-            planner_dir = self.planner_dir + "/" + self.policy + "_" + self.modality + "/free_space"
+        policy_dir = self.policy_dir + "/" + self.default_policy + "_" + self.modality + "/" + self.env
 
-        with open(planner_dir + "/target" + str(target_id) + ".pkl") as f:
-            self.planner = pickle.load(f)
+        with open(policy_dir + "/target" + str(target_id) + ".pkl") as f:
+            default_policy = pickle.load(f)
+
+        # load default policy into planner
+        self.planner.create_policy(default_policy, self.modality)
 
         # reset data logger
         self.logger.reset()

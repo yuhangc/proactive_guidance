@@ -62,6 +62,66 @@ def pre_processing(root_path, usr, cond, flag_visualize=True):
         pickle.dump(np.hstack((dir_in.reshape(-1, 1), dir_out.reshape(-1, 1), mag_out.reshape(-1, 1))), f)
 
 
+def pre_processing_no_orientation(root_path, usr, cond, flag_visualize=True):
+    # first process the one-step case
+    # load the preprocessed data
+    path = root_path + "/" + usr + "/" + cond
+    data_file = path + "/raw_transformed.pkl"
+
+    with open(data_file) as f:
+        t_all, pose_all, protocol_data = pickle.load(f)
+
+    dir_init = -0.5 * np.pi
+    # compute final travel distance and and directions
+    dir_out = []
+    mag_out = []
+    for pose in pose_all:
+        # average the first 10 samples
+        pos_init = np.mean(pose[:10, 0:2], axis=0)
+
+        # average the last 10 samples
+        pos_final = np.mean(pose[-10:, 0:2], axis=0)
+
+        dir_final = np.arctan2(pos_final[1] - pos_init[1], pos_final[0] - pos_init[0])
+
+        dir_out.append(wrap_to_pi(dir_final - dir_init))
+        mag_out.append(np.linalg.norm(pos_final - pos_init))
+
+        dir_init = wrap_to_pi(dir_final + np.pi)
+
+    dir_in = protocol_data[:, 0] * np.pi / 180.0 - np.pi * 0.5
+
+    dir_out = np.asarray(dir_out)
+    dir_in = wrap_to_pi(dir_in)
+    mag_out = np.asarray(mag_out)
+
+    # wrap the dir_out around at end points (-pi and pi)
+    for i in range(len(dir_out)):
+        if dir_out[i] - dir_in[i] > np.pi:
+            dir_out[i] -= 2.0 * np.pi
+        elif dir_out[i] - dir_in[i] < -np.pi:
+            dir_out[i] += 2.0 * np.pi
+
+    # create 2 different plots
+    if flag_visualize:
+        # plot all traj
+        fig, ax = plt.subplots()
+        for pose in pose_all:
+            ax.plot(pose[:, 0], pose[:, 1])
+        ax.axis("equal")
+
+        fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+
+        axes[0].scatter(np.rad2deg(dir_in), np.rad2deg(dir_out))
+        axes[1].scatter(np.rad2deg(dir_in), mag_out)
+
+        plt.show()
+
+    # save data
+    with open(path + "/processed.pkl", 'w') as f:
+        pickle.dump(np.hstack((dir_in.reshape(-1, 1), dir_out.reshape(-1, 1), mag_out.reshape(-1, 1))), f)
+
+
 def visualize_processes(root_path, usr, cond):
     # load the preprocessed data
     path = root_path + "/user" + str(usr) + "/" + cond
@@ -138,7 +198,8 @@ def pre_processing_random_guidance(root_path, usr, flag_visualize=True):
 
 if __name__ == "__main__":
     # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "one_step")
-    pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", "pilot0", "audio")
+    # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", "user1", "audio")
+    pre_processing_no_orientation("/home/yuhang/Documents/proactive_guidance/training_data", "user1", "haptic")
     # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "audio")
     # visualize_processes("/home/yuhang/Documents/proactive_guidance/training_data", 0, "continuous")
 
