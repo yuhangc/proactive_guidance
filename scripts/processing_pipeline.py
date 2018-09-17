@@ -4,11 +4,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
+import sys
+sys.path.append("/home/yuhang/ros_dev/src/proactive_guidance/scripts/model_plan")
+sys.path.append("/home/yuhang/ros_dev/src/proactive_guidance/scripts")
+
 from data_processing.loading import load_save_all
 from model_plan.pre_processing import pre_processing
 from model_plan.gp_model_approx import model_approx_continuous_example, model_approx_create_interp_data
 from model_plan.movement_model import save_default_model
 from model_plan.policies import generate_mdp_policies
+from model_plan.simulation import Simulator
 
 
 def process_user(root_path, usr, training_protocol, modalities):
@@ -26,13 +31,13 @@ def process_user(root_path, usr, training_protocol, modalities):
 if __name__ == "__main__":
     data_path = "/home/yuhang/Documents/proactive_guidance/training_data"
     training_protocol = "../resources/protocols/random_continuous_protocol_5rep2.txt"
-    # modalities = ["haptic", "audio"]
-    modalities = ["haptic"]
+    modalities = ["haptic", "audio"]
+    # modalities = ["haptic"]
 
-    # process_user(data_path, 2, training_protocol, modalities)
+    # process_user(data_path, 3, training_protocol, modalities)
 
-    # save_default_model(2, "../resources/pretrained_models/human_models")
+    # save_default_model(3, "../resources/pretrained_models/human_models")
 
     generate_mdp_policies("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-                          "/home/yuhang/Documents/proactive_guidance/training_data/user2/pretrained_model",
+                          "/home/yuhang/Documents/proactive_guidance/training_data/user2",
                           "haptic", 2)

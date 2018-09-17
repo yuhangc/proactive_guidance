@@ -39,10 +39,15 @@ class GPModelApproxBase(object):
         gp_std = []
 
         for i in range(self.dim):
+            # gp_mean.append(gaussian_process.GaussianProcessRegressor(kernel=1.0 * RBF(length_scale=1.0) +
+            #                                                                 ConstantKernel(0.02, constant_value_bounds=(0.01, 0.05)) * \
+            #                                                                 WhiteKernel(0.1, noise_level_bounds=(0.01, 0.2)),
+            #                                                          n_restarts_optimizer=3))
             gp_mean.append(gaussian_process.GaussianProcessRegressor(kernel=1.0 * RBF(length_scale=1.0) +
-                                                                            ConstantKernel(0.02, constant_value_bounds=(0.01, 0.05)) * \
+                                                                            0.1 * \
                                                                             WhiteKernel(0.1, noise_level_bounds=(0.01, 0.2)),
                                                                      n_restarts_optimizer=3))
+
             # gp_std.append(gaussian_process.GaussianProcessRegressor(kernel=1.0 * RBF(length_scale=0.3) +
             #                                                                0.01 * WhiteKernel(0.01),
             #                                                         n_restarts_optimizer=3))

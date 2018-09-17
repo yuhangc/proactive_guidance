@@ -447,12 +447,12 @@ def validate_MDP_policy(root_path, flag_with_obs=True, flag_plan=True):
     plt.show()
 
 
-def validate_free_space_policy(planner, s_g, modality, path):
+def validate_free_space_policy(planner, s_g, modality, path, model_path):
     fig, axes = plt.subplots()
     planner.visualize_policy(axes)
     fig.savefig(path + "/value_func.png")
 
-    sim = Simulator(planner)
+    sim = Simulator(planner, model_path)
     n_trials = 30
 
     traj_list = []
@@ -493,7 +493,7 @@ def generate_mdp_policies(protocol_file, model_path, modality, usr):
 
     n_targets = int(np.max(protocol_data[:, 0], ) + 1)
     generated = np.zeros((n_targets, ))
-    save_path = model_path + "/mdp_" + modality + "/free_space"
+    save_path = model_path + "/pretrained_model/mdp_" + modality + "/free_space"
 
     ranges = [[-1.5, 4.0], [-1.0, 5.0]]
 
@@ -518,7 +518,8 @@ def generate_mdp_policies(protocol_file, model_path, modality, usr):
             # save some figures for debug
             fig_path = save_path + "/target" + str(target_id) + "_figs"
             mkdir_p(fig_path)
-            validate_free_space_policy(mdp_policy, s_g, modality, fig_path)
+            validate_free_space_policy(mdp_policy, s_g, modality, fig_path,
+                                       model_path)
 
             generated[target_id] = 1.0
 
