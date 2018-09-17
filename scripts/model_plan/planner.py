@@ -112,6 +112,9 @@ class Planner(object):
             self.t = t_new
 
     def update_alp(self, s):
+        if self.s_last is None:
+            return
+            
         # compute measurement
         x_diff = s[:2] - self.s_last[:2]
         alp_m = np.arctan2(x_diff[1], x_diff[0])

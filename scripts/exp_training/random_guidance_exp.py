@@ -138,7 +138,7 @@ class RandomGuidanceExp(object):
                 return False
 
         # should not be too close to each other?
-        d = np.linalg.norm(self.s_g - np.array([x, y]))
+        d = np.linalg.norm(self.s_g[:2] - np.array([x, y]))
         if d < 2.0:
             return False
 
@@ -153,6 +153,7 @@ class RandomGuidanceExp(object):
             x = np.random.uniform(self.x_range[0], self.x_range[1])
             y = np.random.uniform(self.y_range[0], self.y_range[1])
 
+        print "goal is", x, y, "\r"
         return x, y
 
     def start_trial(self):
@@ -216,6 +217,8 @@ class RandomGuidanceExp(object):
                 if rospy.get_time() - t_last >= self.planner_dt:
                     # compute and send feedback
                     x_diff = self.s_g[:2] - pose[:2]
+                    print "possition difference is: ", x_diff, "\r"
+                    print "pose is: ", pose, "\r"
                     cmd = wrap_to_pi(np.arctan2(x_diff[1], x_diff[0]) - pose[2])
 
                     # convert to right format and publish

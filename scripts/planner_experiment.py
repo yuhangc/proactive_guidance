@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-# import sys
-# sys.path.append("/home/yuhang/ros_dev/src/proactive_guidance/scripts/model_plan")
+import sys
+sys.path.append("/home/yuhang/ros_dev/src/proactive_guidance/scripts/model_plan")
 
 import numpy as np
 import pickle
@@ -187,7 +187,7 @@ class PlannerExperiment(object):
             if self.flag_compute_plan:
                 self.flag_compute_plan = False
 
-                self.a_opt = self.planner.compute_plan(t_max=self.t_plan_max, flag_with_prediction=True)
+                self.a_opt = self.planner.compute_plan(t_max=self.t_plan_max, flag_with_prediction=False)
                 self.flag_plan_generated = True
             else:
                 # simply do nothing?
@@ -228,6 +228,8 @@ class PlannerExperiment(object):
                 if t_curr - self.t_meas_last > self.meas_update_dt:
                     self.planner.update_state(pose, t_curr)
                     self.t_meas_last = t_curr
+                    
+                    # print "pose is: ", pose, "\r"
 
                     # first check for stop
                     if self.check_for_stop(pose):
@@ -250,9 +252,11 @@ class PlannerExperiment(object):
 
                 if not flag_stop and not self.flag_is_waiting:
                     dx = np.linalg.norm(pose[:2] - self.s_last_comm[:2])
+                    # print "dx is: ", dx, "\r"
 
                     # minimum 1 second interval and position has changed
                     if t_curr - self.t_plan_last >= self.planner_dt and dx > self.dx_plan_th:
+                        print "prepare to compute plan...\r"
                         # first update alpha
                         self.planner.update_alp(pose)
 
@@ -263,16 +267,21 @@ class PlannerExperiment(object):
                         self.flag_is_waiting = True
 
                 if self.flag_is_waiting and self.flag_plan_generated:
+                    print "got plan\r"
                     self.flag_plan_generated = False
+                    self.flag_is_waiting = False
+                    
+                    if self.a_opt is not None:
+                        self.planner.execute_plan(pose, self.a_opt)
 
-                    # convert to right format and publish
-                    self.publish_haptic_control([self.convert_feedback(self.a_opt), 2])
+                        # convert to right format and publish
+                        self.publish_haptic_control([self.convert_feedback(self.a_opt), 2])
 
-                    # log the feedback
-                    self.logger.log_comm(rospy.get_time() - self.t_trial_start, self.a_opt)
+                        # log the feedback
+                        self.logger.log_comm(rospy.get_time() - self.t_trial_start, self.a_opt)
 
-                    self.t_plan_last = rospy.get_time()
-                    self.s_last_comm = pose
+                        self.t_plan_last = rospy.get_time()
+                        self.s_last_comm = pose.copy()
 
             elif self.state == "Resetting":
                 # wait for some time or user input to start the next trial

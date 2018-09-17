@@ -199,7 +199,8 @@ class MCTSPolicy(object):
                                                                       self.traj_sample_T,
                                                                       flag_return_alp=True)
             except:
-                print "this shouldn't happen"
+                print "select_traj: no traj generated..."
+                return None
 
             t += action_node.t
 
@@ -208,7 +209,8 @@ class MCTSPolicy(object):
 
             if flag_goal_reached:
                 if tf <= 2:
-                    print "this shouldn't happen"
+                    print "select_traj: tf <= 2"
+                    return False
                 traj_node = MCTSTrajNode(alp_d, (t[2:tf], traj[2:tf]))
                 traj_node.goal_reached = True
                 traj_node.parent = action_node
@@ -280,6 +282,7 @@ class MCTSPolicy(object):
             else:
                 if len(traj_node.traj) == 0 or len(traj_node.traj[0]) == 0:
                     print "this is wrong"
+                    return None
                 state_node = MCTSStateNode(traj_node.traj[1][-1], (traj_node.alp_d, 0.0), traj_node.traj[0][-1])
                 state_node.goal_reached = True
                 state_node.parent = traj_node
@@ -311,8 +314,15 @@ class MCTSPolicy(object):
                 a_node.value += self.value_obs
                 a_node.score = self.score_w_value * a_node.value + self.score_w_comm * a_node.n_comm
                 break
+                
+            if not traj_node:
+                break
 
-            node = self.select_time(traj_node)
+            new_node = self.select_time(traj_node)
+            if new_node is None:
+                break
+            # self = node.select_time(traj_node)
+            node = new_node
 
         # instead of run real roll out, use value functions from offline policy
         t_curr = node.t
@@ -495,7 +505,7 @@ class MCTSPolicy(object):
             res_q.put(self.get_policy())
 
         with self.print_lock:
-            print "With Comm: has grown tree ", counter, " times"
+            print "With Comm: has grown tree ", counter, " times\r"
 
     def generate_policy_no_comm(self, s_init, b_init, t_max=0.8, res_q=None):
         start_time = time.time()
@@ -522,7 +532,7 @@ class MCTSPolicy(object):
             res_q.put(self.get_policy_no_comm())
 
         with self.print_lock:
-            print "No Comm: has grown tree ", counter, " times"
+            print "No Comm: has grown tree ", counter, " times\r"
 
     def generate_policy_parallel(self, s_init, b_init, t_max=0.5):
         result_queue = multiprocessing.Queue()

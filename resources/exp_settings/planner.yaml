@@ -1,6 +1,6 @@
 planner: "mcts"
 
-planner_dt: 1.0
+planner_dt: 2.0
 t_plan_max: 0.5
 dx_plan_th: 0.2
 
