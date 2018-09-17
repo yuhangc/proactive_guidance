@@ -84,9 +84,14 @@ class PolicyExperiment(object):
         # publish haptic feedback
         haptic_msg = String()
         haptic_msg.data = "{:d},{:d}".format(int(ctrl[0]), int(ctrl[1]))
-        print haptic_msg.data, "\r"
 
         self.haptic_msg_pub.publish(haptic_msg)
+
+        ctrl[1] -= 90.0
+        if ctrl[1] > 270:
+            ctrl[1] -= 360
+
+        print "{:d},{:d}\r".format(int(ctrl[0]), int(ctrl[1]))
 
     def _monitor_key(self):
         while not rospy.is_shutdown():

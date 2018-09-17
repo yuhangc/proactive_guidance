@@ -61,7 +61,7 @@ class Planner(object):
 
         self.flag_initialized = False
 
-    def compute_plan(self, t_max=0.8, flag_with_prediction=False):
+    def compute_plan(self, t_max=0.8, flag_with_prediction=False, flag_wait_for_t_max=False):
         if self.flag_initialized:
             s = self.s.copy()
             if flag_with_prediction:
@@ -70,7 +70,8 @@ class Planner(object):
             print "belief is: ", self.alp_d_mean, self.alp_d_cov
             res, res_no_comm = self.mcts_policy.generate_policy_parallel(s,
                                                                          (self.alp_d_mean, self.alp_d_cov**0.5),
-                                                                         t_max)
+                                                                         t_max,
+                                                                         flag_wait_for_t_max)
             a_opt, v_comm = res
             v_no_comm = res_no_comm
 
@@ -150,7 +151,7 @@ class PlannerNaive(object):
         self.modality = modality
         self.default_policy = default_policy
 
-    def compute_plan(self, t_max=0.5, flag_with_prediction=False):
+    def compute_plan(self, t_max=0.5, flag_with_prediction=False, flag_wait_for_t_max=False):
         a_opt = self.default_policy.sample_policy(self.s)
         if np.abs(a_opt) > self.a_comm_th or not self.flag_initialized:
             self.flag_initialized = True

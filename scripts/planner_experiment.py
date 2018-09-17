@@ -44,11 +44,13 @@ class PlannerExperiment(object):
         self.t_plan_max = rospy.get_param("~t_plan_max", 0.5)
 
         self.dx_plan_th = rospy.get_param("~dx_plan_th", 0.2)
+        self.dx_alp_th = rospy.get_param("~dx_alp_th", 0.2)
 
         # optimal plan
         self.a_opt = None
 
-        self.s_last_comm = np.zeros((3, ))
+        self.s_last_comm = np.array([5.0, 5.0, 0.0])
+        self.s_last_alp = None
 
         # time interval to check stop and update planner measurement
         self.t_meas_last = 0.0
@@ -108,9 +110,14 @@ class PlannerExperiment(object):
         # publish haptic feedback
         haptic_msg = String()
         haptic_msg.data = "{:d},{:d}".format(int(ctrl[0]), int(ctrl[1]))
-        print haptic_msg.data, "\r"
 
         self.haptic_msg_pub.publish(haptic_msg)
+
+        ctrl[1] -= 90.0
+        if ctrl[1] > 270:
+            ctrl[1] -= 360
+
+        print "{:d},{:d}\r".format(int(ctrl[0]), int(ctrl[1]))
 
     def _monitor_key(self):
         while not rospy.is_shutdown():
@@ -180,6 +187,11 @@ class PlannerExperiment(object):
         print "Starting trial ", self.trial, "...\r"
         self.t_trial_start = rospy.get_time()
 
+        self.flag_compute_plan = False
+        self.flag_plan_generated = False
+
+        self.s_last_alp = None
+
         self.state = "Running"
 
     def _planner_thread(self):
@@ -187,7 +199,9 @@ class PlannerExperiment(object):
             if self.flag_compute_plan:
                 self.flag_compute_plan = False
 
-                self.a_opt = self.planner.compute_plan(t_max=self.t_plan_max, flag_with_prediction=False)
+                self.a_opt = self.planner.compute_plan(t_max=self.t_plan_max,
+                                                       flag_with_prediction=True,
+                                                       flag_wait_for_t_max=True)
                 self.flag_plan_generated = True
             else:
                 # simply do nothing?
@@ -250,15 +264,25 @@ class PlannerExperiment(object):
 
                         flag_stop = True
 
+                # update alpha estimate
+                if self.s_last_alp is not None:
+                    dx_alp = np.linalg.norm(pose[:2] - self.s_last_alp[:2])
+                    if dx_alp >= self.dx_alp_th:
+                        self.planner.update_alp(pose)
+                        self.s_last_alp = pose.copy()
+                else:
+                    self.s_last_alp = pose.copy()
+
                 if not flag_stop and not self.flag_is_waiting:
                     dx = np.linalg.norm(pose[:2] - self.s_last_comm[:2])
                     # print "dx is: ", dx, "\r"
 
                     # minimum 1 second interval and position has changed
-                    if t_curr - self.t_plan_last >= self.planner_dt and dx > self.dx_plan_th:
+                    if t_curr - self.t_plan_last >= self.planner_dt - self.t_plan_max and dx > self.dx_plan_th:
                         print "prepare to compute plan...\r"
                         # first update alpha
                         self.planner.update_alp(pose)
+                        self.s_last_alp = pose.copy()
 
                         # tell planner thread to start plan
                         self.flag_compute_plan = True

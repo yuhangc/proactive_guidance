@@ -100,7 +100,7 @@ class MovementModel(object):
         traj = [self.s.copy()]
 
         # check for stop
-        if np.abs(a[1]) > np.pi:
+        if np.abs(a[1]) > 2.0 * np.pi:
             t_traj.append(T)
             traj.append(self.s.copy())
             return np.asarray(t_traj), np.asarray(traj)
@@ -109,12 +109,14 @@ class MovementModel(object):
         t = self.sample_delay(a)
 
         if t >= T:
-            t_traj.append(T)
-            traj.append(self.s.copy())
-            return np.asarray(t_traj), np.asarray(traj)
-        else:
-            t_traj.append(t)
-            traj.append(self.s.copy())
+            # t_traj.append(T)
+            # traj.append(self.s.copy())
+            # return np.asarray(t_traj), np.asarray(traj)
+            print "movement model: this should not happen...\r"
+            t = T * 0.5
+
+        t_traj.append(t)
+        traj.append(self.s.copy())
 
         # sample the "true" direction that human follows
         # ad_mean, ad_std = self.gp_model[a[0]].predict(a[1])[0]
@@ -129,7 +131,10 @@ class MovementModel(object):
         traj.append(s_next)
 
         if t >= T:
-            return np.asarray(t_traj), np.asarray(traj)
+            if flag_return_alp:
+                return alpha_d, np.asarray(t_traj), np.asarray(traj)
+            else:
+                return np.asarray(t_traj), np.asarray(traj)
 
         # sample straight walking motion
         s_new = s_next

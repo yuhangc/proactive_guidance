@@ -436,7 +436,14 @@ class MCTSPolicy(object):
                 a_node.score = self.score_w_value * a_node.value + self.score_w_comm * a_node.n_comm
                 break
 
-            node = self.select_time(traj_node)
+            if not traj_node:
+                break
+
+            new_node = self.select_time(traj_node)
+            if new_node is None:
+                break
+            # self = node.select_time(traj_node)
+            node = new_node
 
         # instead of run real roll out, use value functions from offline policy
         t_curr = node.t
@@ -534,10 +541,12 @@ class MCTSPolicy(object):
         with self.print_lock:
             print "No Comm: has grown tree ", counter, " times\r"
 
-    def generate_policy_parallel(self, s_init, b_init, t_max=0.5):
+    def generate_policy_parallel(self, s_init, b_init, t_max=0.5, flag_wait_for_t_max=False):
         result_queue = multiprocessing.Queue()
 
         # create two processes to run
+        start_time = time.time()
+
         thread_comm = multiprocessing.Process(target=self.generate_policy, args=[s_init, t_max-0.01, result_queue])
         thread_no_comm = multiprocessing.Process(target=self.generate_policy_no_comm,
                                                  args=[s_init, b_init, t_max-0.01, result_queue])
@@ -548,6 +557,11 @@ class MCTSPolicy(object):
         # wait for threads to finish
         thread_comm.join()
         thread_no_comm.join()
+
+        # if finishes early, wait till time reached
+        if flag_wait_for_t_max:
+            while time.time() - start_time < t_max - 0.01:
+                pass
 
         # get results
         res1 = result_queue.get()
@@ -642,9 +656,9 @@ def policy_search_example(policy_path, modality, flag_no_comm=False):
     print "Goal is: ", mcts_policy.s_g
 
     # generate and visualize tree
-    s_init = np.array([0.65, 2.45, 0.88])
+    s_init = np.array([1.96, 3.57, 0.3])
     if flag_no_comm:
-        b_init = (0.88, 0.1)
+        b_init = (0.3, 0.1)
         mcts_policy.generate_policy_no_comm(s_init, b_init, t_max=0.5)
 
         fig, ax = plt.subplots()
@@ -675,8 +689,8 @@ def policy_search_example(policy_path, modality, flag_no_comm=False):
 
 
 if __name__ == "__main__":
-    policy_search_example("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
-                          "haptic", flag_no_comm=True)
-
-    # policy_search_example("../../resources/pretrained_models/mdp_haptic/free_space/target3.pkl",
+    # policy_search_example("/home/yuhang/Documents/proactive_guidance/training_data/user0/mdp_planenr_obs_haptic.pkl",
     #                       "haptic", flag_no_comm=True)
+
+    policy_search_example("../../resources/pretrained_models/mdp_haptic/free_space/target3.pkl",
+                          "haptic", flag_no_comm=False)
