@@ -8,12 +8,16 @@ from movement_model import MovementModel
 
 
 class Simulator(object):
-    def __init__(self, planner):
+    def __init__(self, planner, model_path=None):
         # use a simple model first
         self.human_model = MovementModel()
 
         # temporarily load a preset model
-        self.human_model.load_model("/home/yuhang/Documents/proactive_guidance/training_data/user0")
+        if model_path is None:
+            self.human_model.load_model("/home/yuhang/Documents/proactive_guidance/training_data/user0")
+        else:
+            self.human_model.load_model(model_path)
+
         self.human_model.set_default_param()
 
         self.planner = planner

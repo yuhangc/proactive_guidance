@@ -77,7 +77,7 @@ p34
 F0.6
 sS'std_vd_heading'
 p35
-F0.1
+F0.05
 sS'std_vd'
 p36
 F0.1
@@ -102,7 +102,7 @@ p44
 F0.0
 sS'std_delay'
 p45
-F0.3
+F0.2
 sbsg24
 g0
 (g28
@@ -117,7 +117,7 @@ F0.0
 sg34
 F0.6
 sg35
-F0.1
+F0.05
 sg36
 F0.1
 sg37
@@ -134,7 +134,7 @@ F0.0
 sg44
 F0.0
 sg45
-F0.3
+F0.2
 sbssS'gp_model'
 p52
 (dp53

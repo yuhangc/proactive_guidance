@@ -48,6 +48,9 @@ class Planner(object):
         self.human_model = default_policy.tmodel
         self.modality = modality
 
+        # reset flag
+        self.flag_initialized = False
+
     def reset(self):
         self.s_last = None
         self.s = None
@@ -58,27 +61,14 @@ class Planner(object):
 
         self.flag_initialized = False
 
-    def compute_plan(self, t_max=0.8):
+    def compute_plan(self, t_max=0.8, flag_with_prediction=False):
         if self.flag_initialized:
-            # create two threads to run plan separately?
-            # thread_comm = multiprocessing.Process(target=self.mcts_policy.generate_policy, args=[self.s, t_max-0.01])
-            # thread_no_comm = multiprocessing.Process(target=self.mcts_policy_no_comm.generate_policy_no_comm,
-            #                                          args=[self.s, (self.alp_d_mean, self.alp_d_cov**0.5), t_max-0.01])
-            #
-            # thread_comm.start()
-            # thread_no_comm.start()
-            #
-            # # wait for threads to finish
-            # thread_comm.join()
-            # thread_no_comm.join()
-            #
-            # # get and compare plan
-            # a_opt, v_comm = self.mcts_policy.get_policy()
-            # v_no_comm = self.mcts_policy_no_comm.get_policy_no_comm()
-            # v_no_comm = -100
+            s = self.s.copy()
+            if flag_with_prediction:
+                s[:2] += np.array(np.cos(s[2]), np.sin(s[2])) * self.v * t_max
 
             print "belief is: ", self.alp_d_mean, self.alp_d_cov
-            res, res_no_comm = self.mcts_policy.generate_policy_parallel(self.s,
+            res, res_no_comm = self.mcts_policy.generate_policy_parallel(s,
                                                                          (self.alp_d_mean, self.alp_d_cov**0.5),
                                                                          t_max)
             a_opt, v_comm = res
@@ -157,7 +147,7 @@ class PlannerNaive(object):
         self.modality = modality
         self.default_policy = default_policy
 
-    def compute_plan(self, t_max=0.5):
+    def compute_plan(self, t_max=0.5, flag_with_prediction=False):
         a_opt = self.default_policy.sample_policy(self.s)
         if np.abs(a_opt) > self.a_comm_th or not self.flag_initialized:
             self.flag_initialized = True

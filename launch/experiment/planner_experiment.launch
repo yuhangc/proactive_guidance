@@ -1,0 +1,20 @@
+<launch>
+    <arg name="policy" default="mdp" />
+    <arg name="modality" default="haptic" />
+    <arg name="exp_id" default="test0" />
+	<arg name="mode" default="manual" />
+    <arg name="env" default="free_space" />
+
+    <node name="planner_experiment" pkg="proactive_guidance" type="planner_experiment.py" output="screen">
+        <param name="planner_dir"
+               value="$(find proactive_guidance)/resources/pretrained_models" />
+        <param name="modality" value="$(arg modality)" />
+        <param name="policy" value="$(arg policy)" />
+        <param name="env" value="$(arg env)" />
+        <param name="protocol_file"
+               value="$(find proactive_guidance)/resources/protocols/free_space_exp_protocol_7targets_$(arg policy).txt"/>
+        <param name="path_saving" value="$(env HOME)/Documents/proactive_guidance/planner_exp/$(arg exp_id)"/>
+		<param name="mode" value="$(arg mode)" />
+        <rosparam command="load" file="$(find proactive_guidance)/resources/exp_settings/planner.yaml" />
+    </node>
+</launch>

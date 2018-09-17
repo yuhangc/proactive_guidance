@@ -167,7 +167,7 @@ if __name__ == "__main__":
                   flag_transform_to_body=False)
 
     # load_free_space_test("/home/yuhang/Documents/proactive_guidance/test_free_space/user0-0912/mdp",
-    #                      "../../resources/protocols/free_space_exp_protocol_7targets.txt")
+    #                      "../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt")
 
     # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/test_free_space/user0-0912/mixed",
     #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")

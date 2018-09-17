@@ -365,14 +365,15 @@ class MDPFixedTimePolicy(object):
         ax.imshow(Vplot.transpose(), origin="lower", cmap="hot", interpolation="nearest")
 
 
-def simulate_naive_policy(n_trials, s_g, modality):
+def simulate_naive_policy(n_trials, s_g, modality, usr):
     planner = NaivePolicy()
 
-    sim = Simulator(planner)
+    model_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(usr)
+    sim = Simulator(planner, model_path)
 
     traj_list = []
     for i in range(n_trials):
-        traj_list.append(sim.run_trial((0.0, 0.0, 0.0), s_g, modality, 15.0, tol=0.5))
+        traj_list.append(sim.run_trial((-1.0, 2.0, 0.0), s_g, modality, 20.0, tol=0.5))
 
     fig, axes = plt.subplots()
     for i in range(n_trials):
@@ -487,7 +488,7 @@ def generate_naive_policies(protocol_file, save_path, modality):
             generated[target_id] = 1.0
 
 
-def generate_mdp_policies(protocol_file, model_path, modality):
+def generate_mdp_policies(protocol_file, model_path, modality, usr):
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 
     n_targets = int(np.max(protocol_data[:, 0], ) + 1)
@@ -500,7 +501,7 @@ def generate_mdp_policies(protocol_file, model_path, modality):
         target_id = int(trial_data[0])
         if generated[target_id] < 1.0:
             # load human model first
-            with open(model_path + "/human_models/user0_default.pkl") as f:
+            with open("../../resources/pretrained_models/human_models/user" + str(usr) + "_default.pkl") as f:
                 human_model = pickle.load(f)
 
             # create the planner
@@ -510,6 +511,7 @@ def generate_mdp_policies(protocol_file, model_path, modality):
             s_g = np.array([trial_data[2], trial_data[3], 0.0])
             mdp_policy.compute_policy(s_g, modality, max_iter=20)
 
+            mkdir_p(save_path)
             with open(save_path + "/target" + str(target_id) + ".pkl", "w") as f:
                 pickle.dump(mdp_policy, f)
 
@@ -540,22 +542,26 @@ def mkdir_p(mypath):
 
 
 if __name__ == "__main__":
-    # simulate_naive_policy(30, np.array([3.0, 2.0, 0.0]), "haptic")
+    # simulate_naive_policy(30, np.array([2.46, 4.00, 0.0]), "haptic", 1)
     # validate_MDP_policy("/home/yuhang/Documents/proactive_guidance/training_data/user0",
     #                     flag_with_obs=True, flag_plan=True)
 
-    # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_7targets.txt",
+    # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
     #                         "../../resources/pretrained_models",
     #                         "haptic")
     #
-    # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_7targets.txt",
+    # generate_naive_policies("../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
     #                         "../../resources/pretrained_models",
     #                         "audio")
 
-    generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_7targets.txt",
-                          "../../resources/pretrained_models",
-                          "haptic")
+    # generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+    #                       "../../resources/pretrained_models",
+    #                       "haptic")
+    #
+    # generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+    #                       "../../resources/pretrained_models",
+    #                       "audio")
 
-    generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_7targets.txt",
-                          "../../resources/pretrained_models",
-                          "audio")
+    generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+                          "/home/yuhang/Documents/proactive_guidance/training_data/user1/pretrained_model",
+                          "haptic", 1)

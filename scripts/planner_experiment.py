@@ -19,7 +19,7 @@ from exp_training.data_recorder import DataLogger
 from exp_training.utils import getKey
 
 
-class PolicyExperiment(object):
+class PlannerExperiment(object):
     def __init__(self):
         # read in configurations
         # create planner
@@ -39,7 +39,20 @@ class PolicyExperiment(object):
         self.env = rospy.get_param("~env", "free_space")
 
         # time interval to update plan
+        self.t_plan_last = 0.0
         self.planner_dt = rospy.get_param("~planner_dt", 1.0)
+        self.t_plan_max = rospy.get_param("~t_plan_max", 0.5)
+
+        self.dx_plan_th = rospy.get_param("~dx_plan_th", 0.2)
+
+        # optimal plan
+        self.a_opt = None
+
+        self.s_last_comm = np.zeros((3, ))
+
+        # time interval to check stop and update planner measurement
+        self.t_meas_last = 0.0
+        self.meas_update_dt = rospy.get_param("~meas_update_dt", 0.1)
 
         # time interval for resetting/pausing
         self.resetting_dt = rospy.get_param("~resetting_dt", 10.0)
@@ -80,6 +93,10 @@ class PolicyExperiment(object):
         self.flag_is_saving = False
 
         self.flag_end_program = False
+
+        self.flag_compute_plan = False
+        self.flag_plan_generated = False
+        self.flag_is_waiting = False
 
         # valid states are "Running", "Pausing", "Resetting", "Resuming"
         self.state = "Pausing"
@@ -165,7 +182,18 @@ class PolicyExperiment(object):
 
         self.state = "Running"
 
-    def _loop(self, trial_start):
+    def _planner_thread(self):
+        while not rospy.is_shutdown() and not self.flag_end_program:
+            if self.flag_compute_plan:
+                self.flag_compute_plan = False
+
+                self.a_opt = self.planner.compute_plan(t_max=self.t_plan_max, flag_with_prediction=True)
+                self.flag_plan_generated = True
+            else:
+                # simply do nothing?
+                pass
+
+    def _exp_thread(self, trial_start):
         self.trial = trial_start
 
         rate = rospy.Rate(40)
@@ -180,10 +208,10 @@ class PolicyExperiment(object):
             rate.sleep()
 
         print "Experiment started...\r"
+        print "Trial will start in ", self.resetting_dt, " seconds...\r"
 
         self.state = "Resetting"
         self.flag_start_trial = False
-        t_last = rospy.get_time()
         self.t_reset_start = rospy.get_time()
 
         while not rospy.is_shutdown() and not self.flag_end_program:
@@ -194,33 +222,57 @@ class PolicyExperiment(object):
                 # get latest tracking
                 pose = self.logger.get_pose()
 
-                # first check for stop
-                if self.check_for_stop(pose):
-                    print "Trial ", self.trial, " ended\r"
+                # update planner measurement
+                t_curr = rospy.get_time()
+                flag_stop = False
+                if t_curr - self.t_meas_last > self.meas_update_dt:
+                    self.planner.update_state(pose, t_curr)
+                    self.t_meas_last = t_curr
 
-                    # save data first
-                    self.logger.save_data(file_name="trial{}".format(self.trial), flag_save_comm=True)
+                    # first check for stop
+                    if self.check_for_stop(pose):
+                        print "Trial ", self.trial, " ended\r"
 
-                    # check if exp ends
-                    self.trial += 1
-                    if self.trial >= len(self.proto_data):
-                        print "All trials finished!\r"
-                        break
+                        # save data first
+                        self.logger.save_data(file_name="trial{}".format(self.trial), flag_save_comm=True)
 
-                    # prepare to reset
-                    self.t_reset_start = rospy.get_time()
-                    self.state = "Resetting"
-                elif rospy.get_time() - t_last >= self.planner_dt:
-                    # compute and send policy
-                    cmd = self.planner.sample_policy(pose)
+                        # check if exp ends
+                        self.trial += 1
+                        if self.trial >= len(self.proto_data):
+                            print "All trials finished!\r"
+                            break
+
+                        # prepare to reset
+                        self.t_reset_start = rospy.get_time()
+                        self.state = "Resetting"
+
+                        flag_stop = True
+
+                if not flag_stop and not self.flag_is_waiting:
+                    dx = np.linalg.norm(pose[:2] - self.s_last_comm[:2])
+
+                    # minimum 1 second interval and position has changed
+                    if t_curr - self.t_plan_last >= self.planner_dt and dx > self.dx_plan_th:
+                        # first update alpha
+                        self.planner.update_alp(pose)
+
+                        # tell planner thread to start plan
+                        self.flag_compute_plan = True
+
+                        # wait for plan
+                        self.flag_is_waiting = True
+
+                if self.flag_is_waiting and self.flag_plan_generated:
+                    self.flag_plan_generated = False
 
                     # convert to right format and publish
-                    self.publish_haptic_control([self.convert_feedback(cmd), 2])
+                    self.publish_haptic_control([self.convert_feedback(self.a_opt), 2])
 
                     # log the feedback
-                    self.logger.log_comm(rospy.get_time() - self.t_trial_start, cmd)
+                    self.logger.log_comm(rospy.get_time() - self.t_trial_start, self.a_opt)
 
-                    t_last = rospy.get_time()
+                    self.t_plan_last = rospy.get_time()
+                    self.s_last_comm = pose
 
             elif self.state == "Resetting":
                 # wait for some time or user input to start the next trial
@@ -249,19 +301,22 @@ class PolicyExperiment(object):
 
     def run(self, trial_start):
         key_thread = threading.Thread(target=self._monitor_key)
-        loop_thread = threading.Thread(target=self._loop, args=[trial_start])
+        exp_thread = threading.Thread(target=self._exp_thread, args=[trial_start])
+        planner_thread = threading.Thread(target=self._planner_thread)
+
         key_thread.start()
-        loop_thread.start()
+        exp_thread.start()
+        planner_thread.start()
 
         key_thread.join()
-        loop_thread.join()
+        exp_thread.join()
+        planner_thread.join()
 
 
 if __name__ == "__main__":
-    rospy.init_node("policy_experiment")
+    rospy.init_node("planner_experiment")
 
     trial_start = rospy.get_param("~trial_start", 0)
 
-    exp = PolicyExperiment()
+    exp = PlannerExperiment()
     exp.run(trial_start)
-

@@ -1,0 +1,12 @@
+planner: "mcts"
+
+planner_dt: 1.0
+t_plan_max: 0.5
+dx_plan_th: 0.2
+
+meas_update_dt: 0.1
+
+resetting_dt: 10.0
+resuming_dt: 5.0
+
+goal_reaching_th: 0.3

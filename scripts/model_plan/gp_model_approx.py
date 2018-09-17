@@ -207,13 +207,13 @@ def model_approx_continuous_example(root_path, modality, flag_train_model=True):
         model_continuous.load_data(root_path + "/" + modality)
         model_continuous.train()
     else:
-        with open(root_path + "/" + modality + "_model.pkl") as f:
+        with open(root_path + "/gp_model_" + modality + ".pkl") as f:
             model_continuous = pickle.load(f)
 
     model_continuous.visualize_model()
 
     if flag_train_model:
-        with open(root_path + "/" + modality + "_model.pkl", "w") as f:
+        with open(root_path + "/gp_model_" + modality + ".pkl", "w") as f:
             pickle.dump(model_continuous, f)
 
 
@@ -238,6 +238,6 @@ if __name__ == "__main__":
     # model_approx_one_step_example("/home/yuhang/Documents/proactive_guidance/training_data/user0", False)
     # model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user0",
     #                                 "continuous", False)
-    model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user1",
-                                    "haptic", True)
-    # model_approx_create_interp_data("/home/yuhang/Documents/proactive_guidance/training_data/user0")
+    # model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user1",
+    #                                 "audio", False)
+    model_approx_create_interp_data("/home/yuhang/Documents/proactive_guidance/training_data/user1")
