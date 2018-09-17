@@ -1,8 +1,4 @@
-
-// Pantograph.ino
-
 // Yuhang Che
-// Adapted from Julie Walker
 // Created on July 27, 2018
 
 #include <PWMServo.h>
@@ -322,17 +318,19 @@ void loop() {
             }
             Serial.print((float)event.orientation.x);
             Serial.print(", ");
-//            Serial.print((float)event.orientation.y);
-//            Serial.print(", ");
-//            Serial.print((float)event.orientation.z);
-//            Serial.print(", ");
+
             Serial.print(system, DEC);
             Serial.print(", ");
             Serial.print(gyro, DEC);
             Serial.print(", ");
             Serial.print(accel, DEC);
             Serial.print(", ");
-            Serial.println(mag, DEC);
+            Serial.print(mag, DEC);
+            Serial.print(", ");
+            
+            Serial.print((float)event.orientation.y);
+            Serial.print(", ");
+            Serial.println((float)event.orientation.z);
 
             nskipped = 0;
         } else {

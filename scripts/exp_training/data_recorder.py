@@ -12,7 +12,7 @@ class DataLogger(object):
         self.save_path = save_path
         self.flag_log_to_file = flag_log_to_file
 
-        self.human_pose = np.zeros((3,))
+        self.human_pose = np.zeros((5,))
         self.pose_latest = np.zeros((3, ))
         self.human_vel = np.zeros((3, ))
         self.cal_data = np.zeros((4, ))
@@ -23,6 +23,7 @@ class DataLogger(object):
         self.cal_hist = []
         self.t_hist = []
         self.comm_hist = []
+        self.extra_info_hist = []
 
         # queues to temporarily store data
         self.pos_queue = Queue.Queue(maxsize=20)
@@ -52,7 +53,7 @@ class DataLogger(object):
     def log(self, t_start):
         while (not self.pos_queue.empty()) and (not self.rot_queue.empty()):
             self.t_meas, self.human_pose[0], self.human_pose[1] = self.pos_queue.get()
-            self.human_pose[2] = self.rot_queue.get()
+            self.human_pose[2], self.human_pose[3], self.human_pose[4] = self.rot_queue.get()
 
             if self.flag_log_to_file:
                 self.save_file.write("{:f}, {:f}, {:f}, {:f}\n".format(self.t_meas-t_start, self.human_pose[0],
@@ -64,22 +65,32 @@ class DataLogger(object):
     def log_comm(self, t_comm, comm):
         self.comm_hist.append([t_comm, comm])
 
-    def save_data(self, file_name="", flag_save_comm=False):
+    def log_extra(self, t_extra, info_extra):
+        # info_extra should be a list
+        self.extra_info_hist.append([t_extra] + info_extra)
+
+    def save_data(self, file_name="", flag_save_comm=False, flag_save_extra=False):
         if self.flag_log_to_file:
             self.save_file.close()
         else:
             data = np.hstack((np.asarray(self.t_hist), np.asarray(self.human_pose_hist)))
             if flag_save_comm:
                 np.savetxt(self.save_path + "/" + file_name + ".txt", data, fmt="%.3f", delimiter=", ")
-                np.savetxt(self.save_path + "/" + file_name + "_comm.txt", np.asarray(self.comm_hist), fmt="%.3f", delimiter=", ")
+                np.savetxt(self.save_path + "/" + file_name + "_comm.txt", np.asarray(self.comm_hist),
+                           fmt="%.3f", delimiter=", ")
             else:
                 np.savetxt(self.save_path + "/" + file_name, data, fmt="%.3f", delimiter=", ")
+
+            if flag_save_extra:
+                np.savetxt(self.save_path + "/" + file_name + "_extra.txt", np.asarray(self.extra_info_hist),
+                           fmt="%.3f", delimiter=", ")
 
     def reset(self):
         self.human_pose_hist = []
         self.human_vel_hist = []
         self.t_hist = []
         self.comm_hist = []
+        self.extra_info_hist = []
         with self.pos_queue.mutex:
             self.pos_queue.queue.clear()
         with self.rot_queue.mutex:
@@ -126,13 +137,15 @@ class DataLogger(object):
             self.cal_data[i] = rot_msg.data[i+1]
 
         # correct rotation
-        rot = (rot_msg.data[0] - self.human_rot_offset) * self.human_rot_inversion
+        roll = (rot_msg.data[0] - self.human_rot_offset) * self.human_rot_inversion
+        pitch = rot_msg.data[5]
+        yaw = rot_msg.daat[6]
 
         if self.rot_queue.full():
             self.rot_queue.get()
-        self.rot_queue.put_nowait(rot)
+        self.rot_queue.put_nowait((roll, pitch, yaw))
 
-        self.pose_latest[2] = np.deg2rad(rot)
+        self.pose_latest[2] = np.deg2rad(roll)
 
 
 if __name__ == "__main__":

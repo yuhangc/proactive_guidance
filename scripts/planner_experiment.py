@@ -270,6 +270,8 @@ class PlannerExperiment(object):
                     if dx_alp >= self.dx_alp_th:
                         self.planner.update_alp(pose)
                         self.s_last_alp = pose.copy()
+
+                        self.logger.log_extra(t_curr, [self.planner.alp_d_mean, self.planner.alp_d_cov, self.planner.v])
                 else:
                     self.s_last_alp = pose.copy()
 

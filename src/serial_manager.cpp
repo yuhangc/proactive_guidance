@@ -57,7 +57,7 @@ void SerialManager::run(const double freq)
             std::stringstream ss(message);
             float val;
 
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < 7; i++) {
                 ss >> val;
                 imu_msg.data.push_back(val);
 

@@ -147,6 +147,11 @@ class PlannerNaive(object):
 
         self.a_comm_th = 0.78
 
+        self.alp_d_mean = 0.0
+        self.alp_d_cov = 0.0
+
+        self.v = 0.0
+
     def create_policy(self, default_policy, modality):
         self.modality = modality
         self.default_policy = default_policy
