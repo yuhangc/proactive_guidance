@@ -501,7 +501,7 @@ def generate_mdp_policies(protocol_file, model_path, modality, usr):
         target_id = int(trial_data[0])
         if generated[target_id] < 1.0:
             # load human model first
-            with open("../../resources/pretrained_models/human_models/user" + str(usr) + "_default.pkl") as f:
+            with open("../resources/pretrained_models/human_models/user" + str(usr) + "_default.pkl") as f:
                 human_model = pickle.load(f)
 
             # create the planner
