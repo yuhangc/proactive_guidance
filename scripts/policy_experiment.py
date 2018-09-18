@@ -61,6 +61,8 @@ class PolicyExperiment(object):
         self.proto_data = np.loadtxt(protocol_file, delimiter=", ")
 
         self.trial = 0
+        
+        self.cmd = 0.0
 
         # a stop command
         self.msg_stop = [270, 0]
@@ -87,11 +89,11 @@ class PolicyExperiment(object):
 
         self.haptic_msg_pub.publish(haptic_msg)
 
-        ctrl[1] -= 90.0
-        if ctrl[1] > 270:
-            ctrl[1] -= 360
+        cmd = ctrl[0] - 90.0
+        if cmd > 270:
+            cmd -= 360
 
-        print "{:d},{:d}\r".format(int(ctrl[0]), int(ctrl[1]))
+        print "{:d},{:d}\r".format(int(cmd), int(ctrl[1]))
 
     def _monitor_key(self):
         while not rospy.is_shutdown():
@@ -212,15 +214,15 @@ class PolicyExperiment(object):
                     # prepare to reset
                     self.t_reset_start = rospy.get_time()
                     self.state = "Resetting"
-                elif rospy.get_time() - t_last >= self.planner_dt:
+                elif rospy.get_time() - t_last >= self.planner_dt + 0.5 * np.abs(self.cmd):
                     # compute and send policy
-                    cmd = self.planner.sample_policy(pose)
+                    self.cmd = self.planner.sample_policy(pose)
 
                     # convert to right format and publish
-                    self.publish_haptic_control([self.convert_feedback(cmd), 2])
+                    self.publish_haptic_control([self.convert_feedback(self.cmd), 2])
 
                     # log the feedback
-                    self.logger.log_comm(rospy.get_time() - self.t_trial_start, cmd)
+                    self.logger.log_comm(rospy.get_time() - self.t_trial_start, self.cmd)
 
                     t_last = rospy.get_time()
 

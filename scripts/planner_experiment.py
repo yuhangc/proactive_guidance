@@ -113,11 +113,11 @@ class PlannerExperiment(object):
 
         self.haptic_msg_pub.publish(haptic_msg)
 
-        ctrl[1] -= 90.0
-        if ctrl[1] > 270:
-            ctrl[1] -= 360
+        cmd = ctrl[0] - 90.0
+        if cmd > 270:
+            cmd -= 360
 
-        print "{:d},{:d}\r".format(int(ctrl[0]), int(ctrl[1]))
+        print "{:d},{:d}\r".format(int(cmd), int(ctrl[1]))
 
     def _monitor_key(self):
         while not rospy.is_shutdown():
@@ -189,6 +189,7 @@ class PlannerExperiment(object):
 
         self.flag_compute_plan = False
         self.flag_plan_generated = False
+        self.flag_is_waiting = False
 
         self.s_last_alp = None
 
@@ -235,34 +236,35 @@ class PlannerExperiment(object):
 
                 # get latest tracking
                 pose = self.logger.get_pose()
+                
+                flag_stop = False
+                # first check for stop
+                if self.check_for_stop(pose):
+                    print "Trial ", self.trial, " ended\r"
+
+                    # save data first
+                    self.logger.save_data(file_name="trial{}".format(self.trial), flag_save_comm=True, flag_save_extra=True)
+
+                    # check if exp ends
+                    self.trial += 1
+                    if self.trial >= len(self.proto_data):
+                        print "All trials finished!\r"
+                        break
+
+                    # prepare to reset
+                    self.t_reset_start = rospy.get_time()
+                    self.state = "Resetting"
+                    flag_stop = True
 
                 # update planner measurement
                 t_curr = rospy.get_time()
-                flag_stop = False
                 if t_curr - self.t_meas_last > self.meas_update_dt:
                     self.planner.update_state(pose, t_curr)
                     self.t_meas_last = t_curr
                     
-                    # print "pose is: ", pose, "\r"
-
-                    # first check for stop
-                    if self.check_for_stop(pose):
-                        print "Trial ", self.trial, " ended\r"
-
-                        # save data first
-                        self.logger.save_data(file_name="trial{}".format(self.trial), flag_save_comm=True)
-
-                        # check if exp ends
-                        self.trial += 1
-                        if self.trial >= len(self.proto_data):
-                            print "All trials finished!\r"
-                            break
-
-                        # prepare to reset
-                        self.t_reset_start = rospy.get_time()
-                        self.state = "Resetting"
-
-                        flag_stop = True
+                    self.logger.log_extra(t_curr-self.t_trial_start, [self.planner.alp_d_mean, self.planner.alp_d_cov, self.planner.v])
+                    
+                    # print "pose is: ", pose, "\r
 
                 # update alpha estimate
                 if self.s_last_alp is not None:
@@ -270,11 +272,10 @@ class PlannerExperiment(object):
                     if dx_alp >= self.dx_alp_th:
                         self.planner.update_alp(pose)
                         self.s_last_alp = pose.copy()
-
-                        self.logger.log_extra(t_curr, [self.planner.alp_d_mean, self.planner.alp_d_cov, self.planner.v])
                 else:
                     self.s_last_alp = pose.copy()
 
+                # print "flag_stop is: ", flag_stop, "flag_is_waiting is: ", self.flag_is_waiting, "\r"
                 if not flag_stop and not self.flag_is_waiting:
                     dx = np.linalg.norm(pose[:2] - self.s_last_comm[:2])
                     # print "dx is: ", dx, "\r"

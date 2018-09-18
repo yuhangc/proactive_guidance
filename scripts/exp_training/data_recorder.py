@@ -40,7 +40,7 @@ class DataLogger(object):
         self.robot_pose = np.zeros((3, ))
 
         self.human_rot_inversion = -1.0
-        self.human_rot_offset = 195.0
+        self.human_rot_offset = 206.0
 
         # open file if in direct mode
         if self.flag_log_to_file:
@@ -139,7 +139,7 @@ class DataLogger(object):
         # correct rotation
         roll = (rot_msg.data[0] - self.human_rot_offset) * self.human_rot_inversion
         pitch = rot_msg.data[5]
-        yaw = rot_msg.daat[6]
+        yaw = rot_msg.data[6]
 
         if self.rot_queue.full():
             self.rot_queue.get()

@@ -29,7 +29,7 @@ class NaiveExperimentBase(object):
         
         self.robot_pose = rospy.get_param("~robot_pose", [0.0, 1.0, np.pi * 0.5])
         self.x_range = rospy.get_param("~x_range", [-5.0, 5.0])
-        self.y_range = rospy.get_param("~y_range", [0.5, 7.0])
+        self.y_range = rospy.get_param("~y_range", [0.0, 7.0])
         self.logger.load_env_config(self.robot_pose, [self.x_range, self.y_range])
 
         self.t_start = 0.0
@@ -174,11 +174,11 @@ class NaiveExperimentContinuousCue(NaiveExperimentBase):
 
         self.haptic_msg_pub.publish(haptic_msg)
 
-        ctrl[1] -= 90.0
-        if ctrl[1] > 270:
-            ctrl[1] -= 360
+        cmd = ctrl[0] - 90.0
+        if cmd > 270:
+            cmd -= 360
 
-        print "{:d},{:d}\r".format(int(ctrl[0]), int(ctrl[1]))
+        print "{:d},{:d}\r".format(int(cmd), int(ctrl[1]))
 
     def _break(self, rate):
         print "Now in break, please press 's' to start next block...\r"

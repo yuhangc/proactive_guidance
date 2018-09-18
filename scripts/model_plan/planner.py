@@ -37,7 +37,7 @@ class Planner(object):
         self.v = 0.0
         self.om = 0.0
 
-        self.v_smooth_factor = 0.5
+        self.v_smooth_factor = 0.1
         self.om_smooth_factor = 0.5
 
         self.cov_m_base = 0.3**2
@@ -65,9 +65,11 @@ class Planner(object):
         if self.flag_initialized:
             s = self.s.copy()
             if flag_with_prediction:
-                s[:2] += np.array(np.cos(s[2]), np.sin(s[2])) * self.v * t_max
+                s[:2] += np.array([np.cos(s[2]), np.sin(s[2])]) * self.v * t_max
 
-            print "belief is: ", self.alp_d_mean, self.alp_d_cov
+            print "belief is: ", self.alp_d_mean, self.alp_d_cov, "\r"
+            print "predicted state is: ", s, "actual state is: ", self.s, "\r"
+            print "goal is: ", self.mcts_policy.s_g, "\r"
             res, res_no_comm = self.mcts_policy.generate_policy_parallel(s,
                                                                          (self.alp_d_mean, self.alp_d_cov**0.5),
                                                                          t_max,
@@ -80,7 +82,7 @@ class Planner(object):
             # self.mcts_policy.visualize_search_tree(self.mcts_policy.root_no_comm, axes[1])
             # plt.show()
 
-            print "Value of communication is: ", v_comm, ", no communication is: ", v_no_comm
+            print "Value of communication is: ", v_comm, ", no communication is: ", v_no_comm, "\r"
 
             if v_no_comm > v_comm:
                 return None
@@ -101,13 +103,17 @@ class Planner(object):
         else:
             x_inc = s_new[:2] - self.s[:2]
             v_new = np.linalg.norm(x_inc / (t_new - self.t))
+            if v_new > 1.0:
+                v_new = 1.0
+                
+            # print "v_new is: ", v_new, "\r"
 
             alp_inc = wrap_to_pi(s_new[2] - self.s[2])
             om_new = alp_inc / (t_new - self.t)
 
             # simple smoothing of velocities
-            self.v = self.v_smooth_factor * self.v + (1.0 - self.v_smooth_factor) * v_new
-            self.om = self.om_smooth_factor * self.om + (1.0 - self.om_smooth_factor) * om_new
+            self.v = self.v_smooth_factor * v_new + (1.0 - self.v_smooth_factor) * self.v
+            self.om = self.om_smooth_factor * om_new + (1.0 - self.om_smooth_factor) * self.om
 
             self.s = s_new.copy()
             self.t = t_new
@@ -119,6 +125,7 @@ class Planner(object):
         # compute measurement
         x_diff = s[:2] - self.s_last[:2]
         alp_m = np.arctan2(x_diff[1], x_diff[0])
+        alp_m += 0.5 * wrap_to_pi(s[2] - alp_m)
 
         d_inc = np.linalg.norm(x_diff)
         cov_m = max([0.05**2, self.cov_m_base - self.cov_m_k * d_inc])
@@ -133,6 +140,7 @@ class Planner(object):
         self.s_last = s.copy()
 
         self.alp_d_mean, ad_std = self.human_model.gp_model[self.modality].predict_fast(a)[0]
+        print "change in alp_d is: ", self.alp_d_mean.copy(), "\r"
         self.alp_d_mean += s[2]
         self.alp_d_cov = ad_std**2
 
