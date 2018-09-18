@@ -543,7 +543,7 @@ def mkdir_p(mypath):
 
 
 if __name__ == "__main__":
-    # simulate_naive_policy(30, np.array([2.46, 4.00, 0.0]), "haptic", 1)
+    simulate_naive_policy(30, np.array([2.46, 4.00, 0.0]), "haptic", 1)
     # validate_MDP_policy("/home/yuhang/Documents/proactive_guidance/training_data/user0",
     #                     flag_with_obs=True, flag_plan=True)
 
@@ -563,6 +563,6 @@ if __name__ == "__main__":
     #                       "../../resources/pretrained_models",
     #                       "audio")
 
-    generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-                          "/home/yuhang/Documents/proactive_guidance/training_data/user1/pretrained_model",
-                          "haptic", 1)
+    # generate_mdp_policies("../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+    #                       "/home/yuhang/Documents/proactive_guidance/training_data/user1/pretrained_model",
+    #                       "haptic", 1)

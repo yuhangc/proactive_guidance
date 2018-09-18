@@ -46,6 +46,8 @@ class PlannerExperiment(object):
         self.dx_plan_th = rospy.get_param("~dx_plan_th", 0.2)
         self.dx_alp_th = rospy.get_param("~dx_alp_th", 0.2)
 
+        self.t_trial_max = rospy.get_param("~t_trial_max", 25.0)
+
         # optimal plan
         self.a_opt = None
 
@@ -148,6 +150,11 @@ class PlannerExperiment(object):
 
             return True
         else:
+            # check for time limit
+            if rospy.get_time() - self.t_trial_start > self.t_trial_max:
+                print "Time limit exceeded...\r"
+                return True
+
             return False
 
     def convert_feedback(self, cmd):
@@ -236,7 +243,7 @@ class PlannerExperiment(object):
 
                 # get latest tracking
                 pose = self.logger.get_pose()
-                
+
                 flag_stop = False
                 # first check for stop
                 if self.check_for_stop(pose):
@@ -261,9 +268,9 @@ class PlannerExperiment(object):
                 if t_curr - self.t_meas_last > self.meas_update_dt:
                     self.planner.update_state(pose, t_curr)
                     self.t_meas_last = t_curr
-                    
+
                     self.logger.log_extra(t_curr-self.t_trial_start, [self.planner.alp_d_mean, self.planner.alp_d_cov, self.planner.v])
-                    
+
                     # print "pose is: ", pose, "\r
 
                 # update alpha estimate
@@ -297,7 +304,7 @@ class PlannerExperiment(object):
                     print "got plan\r"
                     self.flag_plan_generated = False
                     self.flag_is_waiting = False
-                    
+
                     if self.a_opt is not None:
                         self.planner.execute_plan(pose, self.a_opt)
 

@@ -25,7 +25,15 @@ class Simulator(object):
         self.dt = 0.5
         self.dt_comm = 0.0
 
-    def run_trial(self, s_init, s_g, modality, T, tol=0.5):
+    def check_stop(self, traj, s_g, tol):
+        for i in range(len(traj)):
+            err = np.linalg.norm(traj[i, :2] - s_g[:2])
+            if err < tol:
+                return i, True
+
+        return len(traj), False
+
+    def run_trial(self, s_init, s_g, modality, T, tol=0.3):
         self.human_model.set_state(s_init[0], s_init[1], s_init[2])
 
         if modality == "haptic":
@@ -40,16 +48,6 @@ class Simulator(object):
         t_list = ()
         traj_list = ()
         while t < T:
-            # check if goal reached
-            err = np.linalg.norm(s_init[:2] - s_g[:2])
-            if err <= tol:
-                # send stop command to human
-                t_traj, traj = self.human_model.sample_traj_single_action((modality, 10), self.dt, T-t)
-                t_list += t_traj
-                traj_list += traj
-                t = T
-                break
-
             # compute feedback using planner
             alpha_d = self.planner.sample_policy(self.human_model.s)
 
@@ -61,8 +59,25 @@ class Simulator(object):
             s = traj[-1]
             self.human_model.set_state(s[0], s[1], s[2])
 
+            # check if goal reached
+            tf, flag_stopped = self.check_stop(traj, s_g, tol)
+            if flag_stopped:
+                t_list += (t_traj[:tf], )
+                traj_list += (traj[:tf], )
+                break
+
             t_list += (t_traj, )
             traj_list += (traj, )
+
+            # check if goal reached
+            # err = np.linalg.norm(s[:2] - s_g[:2])
+            # if err <= tol:
+            #     # send stop command to human
+            #     # t_traj, traj = self.human_model.sample_traj_single_action((modality, 10), self.dt, T-t)
+            #     # t_list += t_traj
+            #     # traj_list += traj
+            #     # t = T
+            #     break
 
         return np.hstack(t_list), np.vstack(traj_list)
 

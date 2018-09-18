@@ -41,6 +41,8 @@ class PolicyExperiment(object):
         self.t_resume_start = 0.0
         self.t_trial_start = 0.0
 
+        self.t_trial_max = rospy.get_param("~t_trial_max", 25.0)
+
         # goal reaching threshold
         self.goal_reaching_th = rospy.get_param("~goal_reaching_th", 0.3)
 
@@ -61,7 +63,7 @@ class PolicyExperiment(object):
         self.proto_data = np.loadtxt(protocol_file, delimiter=", ")
 
         self.trial = 0
-        
+
         self.cmd = 0.0
 
         # a stop command
@@ -113,9 +115,9 @@ class PolicyExperiment(object):
 
     def check_for_stop(self, s):
         err = np.linalg.norm(s[:2] - self.proto_data[self.trial, 2:4])
-        print "human pose is: ", s, "\r"
-        print self.proto_data[self.trial, 2:4], "\r"
-        print "err is: ", err, "\r"
+        # print "human pose is: ", s, "\r"
+        # print self.proto_data[self.trial, 2:4], "\r"
+        # print "err is: ", err, "\r"
 
         if err < self.goal_reaching_th:
             # send a stop command
@@ -124,6 +126,11 @@ class PolicyExperiment(object):
 
             return True
         else:
+            # check for time limit
+            if rospy.get_time() - self.t_trial_start > self.t_trial_max:
+                print "Time limit exceeded...\r"
+                return True
+
             return False
 
     def convert_feedback(self, cmd):
@@ -166,7 +173,7 @@ class PolicyExperiment(object):
 
         print "Starting trial ", self.trial, "...\r"
         self.t_trial_start = rospy.get_time()
-        
+
         self.state = "Running"
 
     def _loop(self, trial_start):
