@@ -115,9 +115,9 @@ class PolicyExperiment(object):
 
     def check_for_stop(self, s):
         err = np.linalg.norm(s[:2] - self.proto_data[self.trial, 2:4])
-        # print "human pose is: ", s, "\r"
-        # print self.proto_data[self.trial, 2:4], "\r"
-        # print "err is: ", err, "\r"
+        print "human pose is: ", s, "\r"
+        print self.proto_data[self.trial, 2:4], "\r"
+        print "err is: ", err, "\r"
 
         if err < self.goal_reaching_th:
             # send a stop command
@@ -156,7 +156,7 @@ class PolicyExperiment(object):
         # load planner
         target_id = int(self.proto_data[self.trial, 0])
 
-        if self.policy == "mixed":
+        if self.policy == "mixed" or self.policy == "mixed_train":
             policy_id = int(self.proto_data[self.trial, 1])
             if policy_id == 0:
                 planner_dir = self.planner_dir + "/naive_" + self.modality + "/free_space"
