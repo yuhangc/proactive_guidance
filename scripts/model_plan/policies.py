@@ -495,7 +495,7 @@ def generate_mdp_policies(protocol_file, model_path, modality, usr):
     generated = np.zeros((n_targets, ))
     save_path = model_path + "/pretrained_model/mdp_" + modality + "/free_space"
 
-    ranges = [[-1.5, 4.0], [-1.0, 5.0]]
+    ranges = [[-1.5, 4.5], [-1.5, 5.5]]
 
     for trial_data in protocol_data:
         target_id = int(trial_data[0])

@@ -4,6 +4,7 @@ import numpy as np
 import pickle
 
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
 
 
 def wrap_to_pi(ang):
@@ -41,7 +42,7 @@ def transform_to_body(pose):
     return pose_trans
 
 
-def load_save_all(root_path, protocol_file, flag_transform_to_body=True):
+def load_save_all(root_path, protocol_file, flag_transform_to_body=True, rot_offset=-0.4):
     t_all = []
     pose_all =[]
 
@@ -50,6 +51,7 @@ def load_save_all(root_path, protocol_file, flag_transform_to_body=True):
 
     for trial in range(n_trial):
         t, pose = load_trial(root_path, trial)
+        pose[:, 2] += rot_offset
 
         # optionally transform to body frame
         if flag_transform_to_body:
@@ -116,6 +118,15 @@ def load_free_space_test(root_path, protocol_file):
         axes.plot(traj[:, 0], traj[:, 1], color=cm(1. * protocol_data[trial, 0] / n_colors))
         axes.axis("equal")
 
+    # plot the goals
+    visited = np.zeros((100, ))
+    for trial in range(n_trial):
+        trial_id = int(protocol_data[trial, 0])
+        if visited[trial_id] < 1.0:
+            visited[trial_id] = 1.0
+            circ = Circle((protocol_data[trial, 2], protocol_data[trial, 3]), radius=0.35, facecolor='r', alpha=0.3)
+            axes.add_patch(circ)
+
     plt.show()
 
 
@@ -151,6 +162,17 @@ def load_free_space_test_mixed(root_path, protocol_file):
             i_mdp += 1
             axes[1].plot(traj[:, 0], traj[:, 1], color=cm(1. * protocol_data[trial, 0] / n_colors))
 
+    # plot the goals
+    visited = np.zeros((100, ))
+    for trial in range(n_trial):
+        trial_id = int(protocol_data[trial, 0])
+        if visited[trial_id] < 1.0:
+            visited[trial_id] = 1.0
+            circ = Circle((protocol_data[trial, 2], protocol_data[trial, 3]), radius=0.35, facecolor='r', alpha=0.3)
+            axes[0].add_patch(circ)
+            circ = Circle((protocol_data[trial, 2], protocol_data[trial, 3]), radius=0.35, facecolor='r', alpha=0.3)
+            axes[1].add_patch(circ)
+
     axes[0].axis("equal")
     axes[1].axis("equal")
 
@@ -162,14 +184,14 @@ if __name__ == "__main__":
     #               "../../resources/protocols/random_continuous_protocol_10rep2.txt",
     #               120, (2.13, 2.74, -np.pi * 0.75, -np.pi * 0.5))
 
-    load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/user1/haptic",
-                  "../../resources/protocols/random_continuous_protocol_5rep2.txt",
-                  flag_transform_to_body=False)
+    # load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/user1/haptic",
+    #               "../../resources/protocols/random_continuous_protocol_5rep2.txt",
+    #               flag_transform_to_body=False)
 
-    # load_free_space_test("/home/yuhang/Documents/proactive_guidance/test_free_space/user0-0912/mdp",
+    # load_free_space_test("/home/yuhang/Documents/proactive_guidance/planner_exp/user2",
     #                      "../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt")
 
-    # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/test_free_space/user0-0912/mixed",
-    #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+    load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/test_free_space/user2",
+                               "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
     # load_random_guidance_exp("/home/yuhang/Documents/proactive_guidance/training_data/user0/random_guidance", 30)
