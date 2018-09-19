@@ -41,7 +41,9 @@ class Planner(object):
         self.om_smooth_factor = 0.5
 
         self.cov_m_base = 0.3**2
-        self.cov_m_k = (0.3**2 - 0.05**2) / 0.5
+        self.cov_m_k = (0.3**2 - 0.05**2) / 1.0
+
+        self.alp_d_process_cov = 0.05**2
 
     def create_policy(self, default_policy, modality):
         self.mcts_policy = MCTSPolicy(default_policy.tmodel, default_policy, modality)
@@ -125,7 +127,7 @@ class Planner(object):
         # compute measurement
         x_diff = s[:2] - self.s_last[:2]
         alp_m = np.arctan2(x_diff[1], x_diff[0])
-        alp_m += 0.5 * wrap_to_pi(s[2] - alp_m)
+        # alp_m += 0.5 * wrap_to_pi(s[2] - alp_m)
 
         d_inc = np.linalg.norm(x_diff)
         cov_m = max([0.05**2, self.cov_m_base - self.cov_m_k * d_inc])
@@ -134,7 +136,7 @@ class Planner(object):
         self.alp_d_mean += K * wrap_to_pi(alp_m - self.alp_d_mean)
         self.alp_d_mean = wrap_to_pi(self.alp_d_mean)
 
-        self.alp_d_cov = (1.0 - K) * self.alp_d_cov
+        self.alp_d_cov = (1.0 - K) * (self.alp_d_cov + self.alp_d_process_cov)
 
     def execute_plan(self, s, a):
         self.s_last = s.copy()

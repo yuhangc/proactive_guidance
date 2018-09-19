@@ -96,6 +96,9 @@ class DataLogger(object):
         with self.rot_queue.mutex:
             self.rot_queue.queue.clear()
 
+    def adjust_rot_offset(self, ang):
+        self.human_rot_offset += self.human_rot_inversion * np.rad2deg(ang)
+
     def get_pose(self):
         return self.pose_latest
 
@@ -140,6 +143,8 @@ class DataLogger(object):
         roll = (rot_msg.data[0] - self.human_rot_offset) * self.human_rot_inversion
         pitch = rot_msg.data[5]
         yaw = rot_msg.data[6]
+
+        print "euler angles are: ", roll, pitch, yaw, "\r"
 
         if self.rot_queue.full():
             self.rot_queue.get()

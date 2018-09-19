@@ -43,6 +43,19 @@ def compute_traj_stats(traj_list, s_init, s_goal):
     traj_avg = np.mean(traj_list_reparam, axis=0)
     traj_std = np.std(traj_list_reparam, axis=0)
 
+    # rotate the thing back
+    traj_avg_rotated = []
+    traj_ub = []
+    traj_lb = []
+
+    th = np.arctan2(s_vec[1], s_vec[0])
+    rmat = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
+    for i in range(len(s)):
+        point = np.array([s[i], traj_avg[i]])
+        point_trans = np.dot(rmat, point) + s_init
+
+
+
     return s, traj_avg, traj_std
 
 

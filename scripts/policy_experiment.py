@@ -35,11 +35,13 @@ class PolicyExperiment(object):
         self.planner_dt = rospy.get_param("~planner_dt", 2.0)
 
         # time interval for resetting/pausing
+        self.starting_dt = rospy.get_param("~starting_dt", 2.0)
         self.resetting_dt = rospy.get_param("~resetting_dt", 10.0)
         self.resuming_dt = rospy.get_param("~resuming_dt", 5.0)
         self.t_reset_start = 0.0
         self.t_resume_start = 0.0
         self.t_trial_start = 0.0
+        self.t_starting_start = 0.0
 
         self.t_trial_max = rospy.get_param("~t_trial_max", 25.0)
 
@@ -65,6 +67,9 @@ class PolicyExperiment(object):
         self.trial = 0
 
         self.cmd = 0.0
+
+        self.alp_start = 0.0
+        self.alp_start_count = 0
 
         # a stop command
         self.msg_stop = [270, 0]
@@ -168,13 +173,10 @@ class PolicyExperiment(object):
         with open(planner_dir + "/target" + str(target_id) + ".pkl") as f:
             self.planner = pickle.load(f)
 
-        # reset data logger
-        self.logger.reset()
+        print "preparing to start trial...\r"
 
-        print "Starting trial ", self.trial, "...\r"
-        self.t_trial_start = rospy.get_time()
-
-        self.state = "Running"
+        self.state = "Starting"
+        self.t_starting_start = rospy.get_time()
 
     def _loop(self, trial_start):
         self.trial = trial_start
@@ -198,6 +200,28 @@ class PolicyExperiment(object):
         self.t_reset_start = rospy.get_time()
 
         while not rospy.is_shutdown() and not self.flag_end_program:
+            if self.state == "Starting":
+                # keep monitoring the orientation and average up
+                pose = self.logger.get_pose()
+
+                self.alp_start += pose[2]
+                self.alp_start_count += 1
+
+                # check timer
+                if rospy.get_time() - self.t_starting_start:
+                    self.alp_start /= float(self.alp_start_count)
+                    self.logger.adjust_rot_offset(self.alp_start)
+
+                    print "adjusting orientation offset by: ", self.alp_start, "\r"
+
+                    # reset data logger
+                    self.logger.reset()
+
+                    print "Starting trial ", self.trial, "...\r"
+                    self.t_trial_start = rospy.get_time()
+
+                    self.state = "Running"
+
             if self.state == "Running":
                 # log data every loop
                 self.logger.log(self.t_trial_start)
