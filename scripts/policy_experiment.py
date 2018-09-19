@@ -134,6 +134,7 @@ class PolicyExperiment(object):
             # check for time limit
             if rospy.get_time() - self.t_trial_start > self.t_trial_max:
                 print "Time limit exceeded...\r"
+                self.publish_haptic_control(self.msg_stop)
                 return True
 
             return False
@@ -209,11 +210,12 @@ class PolicyExperiment(object):
                 # keep monitoring the orientation and average up
                 pose = self.logger.get_pose()
 
+                print "starting pose is: ", pose[2], "\r"
                 self.alp_start += pose[2]
                 self.alp_start_count += 1
 
                 # check timer
-                if rospy.get_time() - self.t_starting_start:
+                if rospy.get_time() - self.t_starting_start > self.starting_dt:
                     self.alp_start /= float(self.alp_start_count)
                     self.logger.adjust_rot_offset(self.alp_start)
                     

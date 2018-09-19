@@ -13,7 +13,7 @@ from people_msgs.msg import PositionMeasurementArray
 
 from model_plan.gp_model_approx import GPModelApproxBase
 from model_plan.movement_model import MovementModel
-from model_plan.policies import MDPFixedTimePolicy
+from model_plan.policies import MDPFixedTimePolicy, NaivePolicy
 from model_plan.planner import Planner, PlannerNaive
 from exp_training.data_recorder import DataLogger
 from exp_training.utils import getKey
@@ -246,7 +246,7 @@ class PlannerExperiment(object):
                 self.alp_start_count += 1
 
                 # check timer
-                if rospy.get_time() - self.t_starting_start:
+                if rospy.get_time() - self.t_starting_start > self.starting_dt:
                     self.alp_start /= float(self.alp_start_count)
                     self.logger.adjust_rot_offset(self.alp_start)
                     
