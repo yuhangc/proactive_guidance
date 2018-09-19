@@ -120,9 +120,9 @@ class PolicyExperiment(object):
 
     def check_for_stop(self, s):
         err = np.linalg.norm(s[:2] - self.proto_data[self.trial, 2:4])
-        print "human pose is: ", s, "\r"
-        print self.proto_data[self.trial, 2:4], "\r"
-        print "err is: ", err, "\r"
+        # print "human pose is: ", s, "\r"
+        # print self.proto_data[self.trial, 2:4], "\r"
+        # print "err is: ", err, "\r"
 
         if err < self.goal_reaching_th:
             # send a stop command
@@ -140,6 +140,8 @@ class PolicyExperiment(object):
 
     def convert_feedback(self, cmd):
         # first from body-centered to device-centered
+        # if self.policy == "mdp" and cmd < 0:
+        #     cmd -= 0.1
         cmd += np.pi * 0.5
 
         # convert to deg and 0-360
@@ -175,6 +177,9 @@ class PolicyExperiment(object):
 
         print "preparing to start trial...\r"
 
+        self.alp_start = 0.0
+        self.alp_start_cout = 0
+        
         self.state = "Starting"
         self.t_starting_start = rospy.get_time()
 
@@ -211,6 +216,8 @@ class PolicyExperiment(object):
                 if rospy.get_time() - self.t_starting_start:
                     self.alp_start /= float(self.alp_start_count)
                     self.logger.adjust_rot_offset(self.alp_start)
+                    
+                    pose[2] -= self.alp_start
 
                     print "adjusting orientation offset by: ", self.alp_start, "\r"
 
@@ -222,7 +229,7 @@ class PolicyExperiment(object):
 
                     self.state = "Running"
 
-            if self.state == "Running":
+            elif self.state == "Running":
                 # log data every loop
                 self.logger.log(self.t_trial_start)
 
@@ -248,6 +255,7 @@ class PolicyExperiment(object):
                 elif rospy.get_time() - t_last >= self.planner_dt + 0.5 * np.abs(self.cmd):
                     # compute and send policy
                     self.cmd = self.planner.sample_policy(pose)
+                    print "cmd is: ", np.rad2deg(self.cmd), ", pose is: ", pose, "\r"
 
                     # convert to right format and publish
                     self.publish_haptic_control([self.convert_feedback(self.cmd), 2])
@@ -281,6 +289,8 @@ class PolicyExperiment(object):
                 # wait for timer
                 if rospy.get_time() - self.t_resume_start >= self.resuming_dt:
                     self.start_trial()
+                    
+            rate.sleep()
 
     def run(self, trial_start):
         key_thread = threading.Thread(target=self._monitor_key)

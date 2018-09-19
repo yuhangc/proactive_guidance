@@ -40,8 +40,9 @@ class Planner(object):
         self.v_smooth_factor = 0.1
         self.om_smooth_factor = 0.5
 
-        self.cov_m_base = 0.3**2
-        self.cov_m_k = (0.3**2 - 0.05**2) / 1.0
+        self.cov_m_base = 0.2**2
+        self.cov_m_min = 0.05**2
+        self.cov_m_k = (0.2**2 - 0.05**2) / 1.0
 
         self.alp_d_process_cov = 0.05**2
 
@@ -68,6 +69,7 @@ class Planner(object):
             s = self.s.copy()
             if flag_with_prediction:
                 s[:2] += np.array([np.cos(s[2]), np.sin(s[2])]) * self.v * t_max
+                s[2] += 0.5 * wrap_to_pi(self.alp_d_mean - s[2])
 
             print "belief is: ", self.alp_d_mean, self.alp_d_cov, "\r"
             print "predicted state is: ", s, "actual state is: ", self.s, "\r"
@@ -128,9 +130,14 @@ class Planner(object):
         x_diff = s[:2] - self.s_last[:2]
         alp_m = np.arctan2(x_diff[1], x_diff[0])
         # alp_m += 0.5 * wrap_to_pi(s[2] - alp_m)
+        
+        print "alp_m is: ", alp_m, "state is: ", s[2], "\r"
+        print "s_last is: ", self.s_last, "\r"
 
         d_inc = np.linalg.norm(x_diff)
         cov_m = max([0.05**2, self.cov_m_base - self.cov_m_k * d_inc])
+        
+        alp_m += (1.0 - self.cov_m_min / cov_m) * wrap_to_pi(s[2] - alp_m)
 
         K = self.alp_d_cov / (self.alp_d_cov + cov_m)
         self.alp_d_mean += K * wrap_to_pi(alp_m - self.alp_d_mean)
@@ -144,6 +151,7 @@ class Planner(object):
         self.alp_d_mean, ad_std = self.human_model.gp_model[self.modality].predict_fast(a)[0]
         print "change in alp_d is: ", self.alp_d_mean.copy(), "\r"
         self.alp_d_mean += s[2]
+        print "alp_d is: ", self.alp_d_mean, "\r"
         self.alp_d_cov = ad_std**2
 
 

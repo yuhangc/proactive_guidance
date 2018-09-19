@@ -144,7 +144,7 @@ class DataLogger(object):
         pitch = rot_msg.data[5]
         yaw = rot_msg.data[6]
 
-        print "euler angles are: ", roll, pitch, yaw, "\r"
+        # print "euler angles are: ", roll, pitch, yaw, "\r"
 
         if self.rot_queue.full():
             self.rot_queue.get()

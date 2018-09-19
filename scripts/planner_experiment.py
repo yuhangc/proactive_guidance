@@ -59,11 +59,16 @@ class PlannerExperiment(object):
         self.meas_update_dt = rospy.get_param("~meas_update_dt", 0.1)
 
         # time interval for resetting/pausing
+        self.starting_dt = rospy.get_param("~starting_dt", 2.0)
         self.resetting_dt = rospy.get_param("~resetting_dt", 10.0)
         self.resuming_dt = rospy.get_param("~resuming_dt", 5.0)
         self.t_reset_start = 0.0
         self.t_resume_start = 0.0
         self.t_trial_start = 0.0
+        self.t_starting_start = 0.0
+        
+        self.alp_start = 0.0
+        self.alp_start_count = 0
 
         # goal reaching threshold
         self.goal_reaching_th = rospy.get_param("~goal_reaching_th", 0.3)
@@ -153,6 +158,8 @@ class PlannerExperiment(object):
             # check for time limit
             if rospy.get_time() - self.t_trial_start > self.t_trial_max:
                 print "Time limit exceeded...\r"
+                self.publish_haptic_control(self.msg_stop)
+                
                 return True
 
             return False
@@ -187,20 +194,14 @@ class PlannerExperiment(object):
 
         # load default policy into planner
         self.planner.create_policy(default_policy, self.modality)
+        
+        print "preparing to start trial...\r"
 
-        # reset data logger
-        self.logger.reset()
-
-        print "Starting trial ", self.trial, "...\r"
-        self.t_trial_start = rospy.get_time()
-
-        self.flag_compute_plan = False
-        self.flag_plan_generated = False
-        self.flag_is_waiting = False
-
-        self.s_last_alp = None
-
-        self.state = "Running"
+        self.alp_start = 0.0
+        self.alp_start_cout = 0
+        
+        self.state = "Starting"
+        self.t_starting_start = rospy.get_time()
 
     def _planner_thread(self):
         while not rospy.is_shutdown() and not self.flag_end_program:
@@ -237,7 +238,37 @@ class PlannerExperiment(object):
         self.t_reset_start = rospy.get_time()
 
         while not rospy.is_shutdown() and not self.flag_end_program:
-            if self.state == "Running":
+            if self.state == "Starting":
+                # keep monitoring the orientation and average up
+                pose = self.logger.get_pose()
+
+                self.alp_start += pose[2]
+                self.alp_start_count += 1
+
+                # check timer
+                if rospy.get_time() - self.t_starting_start:
+                    self.alp_start /= float(self.alp_start_count)
+                    self.logger.adjust_rot_offset(self.alp_start)
+                    
+                    pose[2] -= self.alp_start
+
+                    print "adjusting orientation offset by: ", self.alp_start, "\r"
+           
+                    # reset data logger
+                    self.logger.reset()
+
+                    print "Starting trial ", self.trial, "...\r"
+                    self.t_trial_start = rospy.get_time()
+
+                    self.flag_compute_plan = False
+                    self.flag_plan_generated = False
+                    self.flag_is_waiting = False
+
+                    self.s_last_alp = None
+
+                    self.state = "Running"
+
+            elif self.state == "Running":
                 # log data every loop
                 self.logger.log(self.t_trial_start)
 
@@ -307,6 +338,7 @@ class PlannerExperiment(object):
 
                     if self.a_opt is not None:
                         self.planner.execute_plan(pose, self.a_opt)
+                        print "action is: ", self.a_opt, "state is: ", pose, "\r"
 
                         # convert to right format and publish
                         self.publish_haptic_control([self.convert_feedback(self.a_opt), 2])
@@ -341,6 +373,8 @@ class PlannerExperiment(object):
                 # wait for timer
                 if rospy.get_time() - self.t_resume_start >= self.resuming_dt:
                     self.start_trial()
+            
+            rate.sleep()
 
     def run(self, trial_start):
         key_thread = threading.Thread(target=self._monitor_key)

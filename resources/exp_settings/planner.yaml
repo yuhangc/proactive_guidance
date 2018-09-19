@@ -9,4 +9,4 @@ meas_update_dt: 0.1
 resetting_dt: 10.0
 resuming_dt: 5.0
 
-goal_reaching_th: 0.3
+goal_reaching_th: 0.35
