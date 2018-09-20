@@ -103,8 +103,21 @@ def load_free_space_test(root_path, protocol_file):
     pose_all =[]
     for trial in range(n_trial):
         data = np.loadtxt(root_path + "/trial" + str(trial) + ".txt", delimiter=", ")
+
+        traj = data[:, 1:]
+
+        # extend the traj a little for visual effect
+        s = traj[-1].copy()
+        s_g = protocol_data[trial, 2:]
+
+        d = np.linalg.norm(s[:2] - s_g)
+        if d >= 0.3:
+            th = np.arctan2(s_g[1] - s[1], s_g[0] - s[0])
+            s += np.array([np.cos(th), np.sin(th), 0.0, 0.0, 0.0]) * 0.1
+            traj = np.vstack((traj, s.reshape(1, -1)))
+
         t_all.append(data[:, 0])
-        pose_all.append(data[:, 1:])
+        pose_all.append(traj)
 
     # visualize
     # generate a color map
@@ -130,7 +143,7 @@ def load_free_space_test(root_path, protocol_file):
     plt.show()
 
 
-def load_free_space_test_mixed(root_path, protocol_file):
+def visualize_free_space_test_mixed(root_path, protocol_file):
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 
     n_trial = len(protocol_data)
@@ -139,10 +152,22 @@ def load_free_space_test_mixed(root_path, protocol_file):
     pose_all_naive = []
     for trial in range(n_trial):
         data = np.loadtxt(root_path + "/trial" + str(trial) + ".txt", delimiter=", ")
+        traj = data[:, 1:]
+
+        # extend the traj a little for visual effect
+        s = traj[-1].copy()
+        s_g = protocol_data[trial, 2:]
+
+        d = np.linalg.norm(s[:2] - s_g)
+        if d >= 0.3:
+            th = np.arctan2(s_g[1] - s[1], s_g[0] - s[0])
+            s += np.array([np.cos(th), np.sin(th), 0.0, 0.0, 0.0]) * 0.1
+            traj = np.vstack((traj, s.reshape(1, -1)))
+
         if protocol_data[trial, 1] == 0:
-            pose_all_naive.append(data[:, 1:])
+            pose_all_naive.append(traj)
         else:
-            pose_all_mpd.append(data[:, 1:])
+            pose_all_mpd.append(traj)
 
     # visualize
     # generate a color map
@@ -176,7 +201,68 @@ def load_free_space_test_mixed(root_path, protocol_file):
     axes[0].axis("equal")
     axes[1].axis("equal")
 
+    axes[0].set_title("Naive Policy")
+    axes[1].set_title("Optimized Policy")
+
     plt.show()
+
+
+def load_free_space_test_mixed(root_path, protocol_file):
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+
+    n_trial = len(protocol_data)
+
+    n_target = int(max(protocol_data[:, 0])) + 1
+
+    traj_naive = [[] for i in range(n_target)]
+    traj_mdp = [[] for i in range(n_target)]
+    comm_naive = [[] for i in range(n_target)]
+    comm_mdp = [[] for i in range(n_target)]
+    for trial in range(n_trial):
+        data = np.loadtxt(root_path + "/trial" + str(trial) + ".txt", delimiter=", ")
+        comm_data = np.loadtxt(root_path + "/trial" + str(trial) + "_comm.txt", delimiter=", ")
+
+        target_id = int(protocol_data[trial, 0])
+        traj = data
+
+        if protocol_data[trial, 1] == 0:
+            traj_naive[target_id].append(traj)
+            comm_naive[target_id].append(comm_data)
+        else:
+            traj_mdp[target_id].append(traj)
+            comm_mdp[target_id].append(comm_data)
+
+    with open(root_path + "/traj_raw.pkl", "w") as f:
+        pickle.dump((traj_naive, traj_mdp), f)
+
+    with open(root_path + "/comm_raw.pkl", "w") as f:
+        pickle.dump((comm_naive, comm_mdp), f)
+
+
+def load_planner_exp(root_path, protocol_file):
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+
+    n_trial = len(protocol_data)
+
+    n_target = int(max(protocol_data[:, 0])) + 1
+
+    traj_list = [[] for i in range(n_target)]
+    comm_list = [[] for i in range(n_target)]
+    for trial in range(n_trial):
+        data = np.loadtxt(root_path + "/trial" + str(trial) + ".txt", delimiter=", ")
+        comm_data = np.loadtxt(root_path + "/trial" + str(trial) + "_comm.txt", delimiter=", ")
+
+        target_id = int(protocol_data[trial, 0])
+        traj = data
+
+        traj_list[target_id].append(traj)
+        comm_list[target_id].append(comm_data)
+
+    with open(root_path + "/traj_raw.pkl", "w") as f:
+        pickle.dump(traj_list, f)
+
+    with open(root_path + "/comm_raw.pkl", "w") as f:
+        pickle.dump(comm_list, f)
 
 
 if __name__ == "__main__":
@@ -188,10 +274,16 @@ if __name__ == "__main__":
     #               "../../resources/protocols/random_continuous_protocol_5rep2.txt",
     #               flag_transform_to_body=False)
 
-    # load_free_space_test("/home/yuhang/Documents/proactive_guidance/planner_exp/user2",
+    # load_free_space_test("/home/yuhang/Documents/proactive_guidance/planner_exp/user0",
     #                      "../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt")
 
-    load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/test_free_space/user2",
+    # visualize_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/test_free_space/user0",
+    #                                 "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+
+    load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/test_free_space/user3",
                                "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+
+    load_planner_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
+                     "../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt")
 
     # load_random_guidance_exp("/home/yuhang/Documents/proactive_guidance/training_data/user0/random_guidance", 30)
