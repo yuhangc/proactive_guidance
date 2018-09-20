@@ -9,8 +9,9 @@ import pickle
 
 from model_plan.policies import validate_free_space_policy
 from model_plan.simulation import Simulator
-from model_plan.policies import NaivePolicy
+from model_plan.policies import NaivePolicy, MDPFixedTimePolicy
 from model_plan.policies import simulate_naive_policy
+from data_processing.loading import wrap_to_pi
 
 
 def compute_traj_stats(traj_list, s_init, s_goal):
@@ -138,9 +139,93 @@ def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30, modality
     plt.show()
 
 
+def visualize_policy_diff(p1_file, p2_file):
+    # load the policy files
+    with open(p1_file) as f:
+        p1 = pickle.load(f)
+
+    with open(p2_file) as f:
+        p2 = pickle.load(f)
+
+    # range for visualization
+    x_range = [-1.5, 4.25]
+    y_range = [-1.5, 5.25]
+    a_range = [-np.pi, np.pi]
+    dx = 0.25
+    dy = 0.25
+
+    nX = int((x_range[1] - x_range[0]) / dx) + 1
+    nY = int((y_range[1] - y_range[0]) / dy) + 1
+    nA = 24
+
+    da = (a_range[1] - a_range[0]) / nA
+
+    policy_diff = np.zeros((nX, nY))
+
+    xgg, ygg, tmp = p2.xy_to_grid(p2.s_g[0], p2.s_g[1], 0.0)
+
+    for xg in range(nX):
+        for yg in range(nY):
+            if xg == xgg and yg == ygg:
+                continue
+
+            if yg == 14 and xg == 19:
+                print "hjere"
+
+            diff_max = 0.0
+            for ag in range(nA):
+            # for ag in [11, 12, 13]:
+                x = x_range[0] + dx * xg
+                y = y_range[0] + dy * yg
+                # a = a_range[0] + da * ag
+                a = 0.0
+
+                cmd1 = p1.sample_policy((x, y, a))
+                cmd2 = p2.sample_policy((x, y, a))
+                cmd_diff = wrap_to_pi(cmd1 - cmd2)
+
+                if np.abs(cmd_diff) > diff_max:
+                    diff_max = np.abs(cmd_diff)
+
+            policy_diff[xg, yg] = diff_max
+
+            # for ag in range(nA):
+            #     x = x_range[0] + dx * xg
+            #     y = y_range[0] + dy * yg
+            #     a = a_range[0] + da * ag
+            #
+            #     cmd1 = p1.sample_policy((x, y, a))
+            #     cmd2 = p2.sample_policy((x, y, a))
+            #     cmd_diff = wrap_to_pi(cmd1 - cmd2)
+            #
+            #     diff_max += np.abs(cmd_diff)
+            #
+            # policy_diff[xg, yg] = diff_max / nA
+
+    policy_diff[xgg, ygg] = np.min(policy_diff)
+
+    print np.max(policy_diff)
+
+    fig, ax = plt.subplots()
+    ax.imshow(policy_diff.transpose(), origin="lower", cmap="hot", interpolation="nearest")
+    plt.show()
+
+
+def visualize_naive_mdp_policy_diff(root_path, user, target):
+    p1_file = root_path + "/user" + str(user) + \
+              "/pretrained_model/naive_haptic/free_space/target" + str(target) + ".pkl"
+
+    p2_file = root_path + "/user" + str(user) + \
+              "/pretrained_model/mdp_haptic/free_space/target" + str(target) + ".pkl"
+
+    visualize_policy_diff(p1_file, p2_file)
+
+
 if __name__ == "__main__":
-    s_init = np.array([-1.0, 2.0, 0.0])
-    visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-                          4, "mdp", s_init)
+    # s_init = np.array([-1.0, 2.0, 0.0])
+    # visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+    #                       4, "mdp", s_init)
 
     # simulate_naive_policy(30, np.array([2.46, 4.00, 0.0]), "haptic", 3)
+
+    visualize_naive_mdp_policy_diff("/home/yuhang/Documents/proactive_guidance/training_data", 4, 0)
