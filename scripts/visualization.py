@@ -2,10 +2,15 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.path as mpath
+import matplotlib.patches as mpatches
+
 import pickle
 
 from model_plan.policies import validate_free_space_policy
 from model_plan.simulation import Simulator
+from model_plan.policies import NaivePolicy
+from model_plan.policies import simulate_naive_policy
 
 
 def compute_traj_stats(traj_list, s_init, s_goal):
@@ -18,7 +23,7 @@ def compute_traj_stats(traj_list, s_init, s_goal):
 
     for t, traj in traj_list:
         # append s_goal
-        traj.append(s_goal.copy())
+        traj = np.vstack((traj, s_goal.reshape(1, -1)))
 
         s_traj = []
         y_traj = []
@@ -30,7 +35,7 @@ def compute_traj_stats(traj_list, s_init, s_goal):
 
             y = np.linalg.norm(u - v)
 
-            if np.cross(u, v) > 0:
+            if np.cross(u, v) < 0:
                 y_traj.append(y)
             else:
                 y_traj.append(-y)
@@ -52,14 +57,22 @@ def compute_traj_stats(traj_list, s_init, s_goal):
     rmat = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
     for i in range(len(s)):
         point = np.array([s[i], traj_avg[i]])
-        point_trans = np.dot(rmat, point) + s_init
+        point_trans = np.dot(rmat, point) + s_init[:2]
+        traj_avg_rotated.append(point_trans)
+
+        point = np.array([s[i], traj_avg[i] + traj_std[i]])
+        point_trans = np.dot(rmat, point) + s_init[:2]
+        traj_ub.append(point_trans)
+
+        point = np.array([s[i], traj_avg[i] - traj_std[i]])
+        point_trans = np.dot(rmat, point) + s_init[:2]
+        traj_lb.append(point_trans)
+
+    # return (s, traj_avg, traj_std), (traj_avg_rotated, traj_ub, traj_lb)
+    return np.asarray(traj_avg_rotated), np.asarray(traj_ub), np.asarray(traj_lb)
 
 
-
-    return s, traj_avg, traj_std
-
-
-def visualize_mdp_policy_traj(protocol_file, usr, policy, s_init, n_rep=30, modality="haptic", style="cov"):
+def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30, modality="haptic", style="cov"):
     # load the protocol
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 
@@ -72,10 +85,13 @@ def visualize_mdp_policy_traj(protocol_file, usr, policy, s_init, n_rep=30, moda
             targets.append(target)
 
     # for each target
+    fig, axes = plt.subplots()
+    cm = plt.get_cmap("gist_rainbow")
+
     for target in targets:
         # load policy
         policy_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(usr) + \
-                      "/pretrained_mode/" + policy + "_" + modality + "/free_space"
+                      "/pretrained_model/" + policy + "_" + modality + "/free_space"
         with open(policy_path + "/target" + str(target) + ".pkl") as f:
             planner = pickle.load(f)
 
@@ -89,10 +105,42 @@ def visualize_mdp_policy_traj(protocol_file, usr, policy, s_init, n_rep=30, moda
             traj_list.append(sim.run_trial(s_init, planner.s_g, modality, T, tol=0.3))
 
         # compute the average (and covariance?)
-        s, traj_avg, traj_std = compute_traj_stats(traj_list, s_init, planner.s_g)
+        traj_avg, traj_ub, traj_lb = compute_traj_stats(traj_list, s_init, planner.s_g)
 
         # plot the thing
+        if style == "cov":
+
+            axes.plot(traj_ub[:, 0], traj_ub[:, 1], color=(0.7, 0.7, 0.7))
+            axes.plot(traj_lb[:, 0], traj_lb[:, 1], color=(0.7, 0.7, 0.7))
+
+            # add a patch
+            cov_path = mpath.Path
+            path_data = [(cov_path.MOVETO, traj_ub[0, :2])]
+
+            for i in range(1, len(traj_ub)):
+                path_data.append((cov_path.LINETO, traj_ub[i, :2]))
+
+            for point in reversed(traj_lb):
+                path_data.append((cov_path.LINETO, point[:2]))
+
+            codes, verts = zip(*path_data)
+            cov_path = mpath.Path(verts, codes)
+            axes.add_patch(mpatches.PathPatch(cov_path,
+                                              color=cm(1. * target / len(targets)),
+                                              alpha=0.3))
+
+            axes.plot(traj_avg[:, 0], traj_avg[:, 1],
+                      color=cm(1. * target / len(targets)),
+                      lw=2)
+
+        axes.axis("equal")
+
+    plt.show()
 
 
 if __name__ == "__main__":
-    pass
+    s_init = np.array([-1.0, 2.0, 0.0])
+    visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+                          4, "mdp", s_init)
+
+    # simulate_naive_policy(30, np.array([2.46, 4.00, 0.0]), "haptic", 3)

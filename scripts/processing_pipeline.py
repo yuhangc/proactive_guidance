@@ -48,3 +48,6 @@ if __name__ == "__main__":
     # generate_mdp_policies("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
     #                       "/home/yuhang/Documents/proactive_guidance/training_data/user2",
     #                       "haptic", 2)
+
+    model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user1",
+                                    "audio", False)
