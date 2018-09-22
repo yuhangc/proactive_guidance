@@ -197,14 +197,16 @@ class MDPFixedTimePolicy(object):
 
         # set goal value
         xgg, ygg, tmp = self.xy_to_grid(s_g[0], s_g[1], 0.0)
-        self.V[xgg, ygg] += self.r_goal
+        goal_states = [(xgg, ygg), (xgg+1, ygg), (xgg+1, ygg+1), (xgg, ygg+1)]
 
         # perform a BFS to initialize values of all states and obtain an update sequence
         visited = np.zeros((self.nX, self.nY))
         nodes = deque()
 
-        visited[xgg, ygg] = 1.0
-        nodes.append((xgg, ygg))
+        for state in goal_states:
+            self.V[state[0], state[1]] += self.r_goal
+            visited[state[0], state[1]] = 1.0
+            nodes.append((state[0], state[1]))
 
         dx = [0, 1, 1, 1, 0, -1, -1, -1]
         dy = [1, 1, 0, -1, -1, -1, 0, 1]
@@ -228,14 +230,22 @@ class MDPFixedTimePolicy(object):
                     # update value and initial policy
                     for alp_g in range(self.nAlp):
                         # value is same for all orientation
+                        a = self.gamma * self.V[xg, yg, 0]
                         self.V[xg_next, yg_next, alp_g] = self.gamma * self.V[xg, yg, 0]
 
                         # apply naive policy
                         x, y, alp = self.grid_to_xy(xg_next, yg_next, alp_g)
                         self.policy[xg_next, yg_next, alp_g] = wrap_to_pi(np.arctan2(-dy[i], -dx[i]) - alp)
 
-                        # self.visualize_policy()
-                        # plt.show()
+        # self.visualize_policy()
+        # plt.show()
+
+        # initialize the policies at goal states
+        for i, state in enumerate(goal_states):
+            a_opt = np.pi / 4.0 + i * 0.5 * np.pi
+            for ag in range(self.nAlp):
+                alp = self.alp_offset + ag * self.dalp
+                self.policy[state[0], state[1], ag] = wrap_to_pi(a_opt - alp)
 
     def compute_policy(self, s_g, modality, max_iter=50):
         if self.flag_policy_computed and self.modality == modality:
@@ -260,7 +270,7 @@ class MDPFixedTimePolicy(object):
         else:
             self.dt = 3.0
 
-        self.init_value_function(s_g)
+        self.init_value_function(self.s_g)
 
         counter_policy_not_updated = 0
         for i in range(max_iter):
@@ -284,7 +294,7 @@ class MDPFixedTimePolicy(object):
                     # don't perform update on goal state
                     # if self.obs[xg, yg] > 0:
                     #     continue
-                    if xg == xgg and yg == ygg:
+                    if (xg == xgg or xg == xgg+1) and (yg == ygg or yg == ygg+1):
                         continue
 
                     x, y, alp = self.grid_to_xy(xg, yg, alp_g)
@@ -301,7 +311,13 @@ class MDPFixedTimePolicy(object):
                     for ai, a in enumerate(a_list):
                         Vnext = 0.0
                         n_comm_next = 0.0
-                        for k in range(self.n_samples):
+
+                        if i < max_iter-5:
+                            n_samples = self.n_samples
+                        else:
+                            n_samples = 2 * self.n_samples
+
+                        for k in range(n_samples):
                             # sample a new state
                             self.tmodel.set_state(x, y, alp)
 
@@ -326,8 +342,8 @@ class MDPFixedTimePolicy(object):
                         # if Vnext != 0:
                         #     print "here"
 
-                        self.Q[xg, yg, alp_g, ai] = self.gamma * Vnext / self.n_samples
-                        n_comm_next /= self.n_samples
+                        self.Q[xg, yg, alp_g, ai] = self.gamma * Vnext / n_samples
+                        n_comm_next /= n_samples
 
                         if self.Q[xg, yg, alp_g, ai] > Q_max:
                             Q_max = self.Q[xg, yg, alp_g, ai]
@@ -353,8 +369,8 @@ class MDPFixedTimePolicy(object):
             else:
                 counter_policy_not_updated = 0
 
-                # self.visualize_policy()
-                # plt.show()
+            # self.visualize_policy()
+            # plt.show()
 
         self.flag_policy_computed = True
 
