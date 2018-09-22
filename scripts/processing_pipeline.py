@@ -17,7 +17,7 @@ from model_plan.simulation import Simulator
 
 
 def process_user(root_path, usr, training_protocol, modalities):
-    offsets = {"haptic": -0.0, "audio": -0.35}
+    offsets = {"haptic": -0.25, "audio": -0.35}
 
     for modality in modalities:
         load_save_all(root_path + "/user" + str(usr) + "/" + modality,
@@ -38,16 +38,16 @@ def process_user(root_path, usr, training_protocol, modalities):
 if __name__ == "__main__":
     data_path = "/home/yuhang/Documents/proactive_guidance/training_data"
     training_protocol = "../resources/protocols/random_continuous_protocol_5rep2.txt"
-    # modalities = ["haptic", "audio"]
-    modalities = ["audio"]
+    modalities = ["haptic", "audio"]
+    # modalities = ["audio"]
 
-    # process_user(data_path, 1, training_protocol, modalities)
+    # process_user(data_path, 6, training_protocol, modalities)
     #
-    # save_default_model(1, "../resources/pretrained_models/human_models")
+    # save_default_model(6, "../resources/pretrained_models/human_models")
 
-    # generate_mdp_policies("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-    #                       "/home/yuhang/Documents/proactive_guidance/training_data/user2",
-    #                       "haptic", 2)
+    generate_mdp_policies("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+                          "/home/yuhang/Documents/proactive_guidance/training_data/user6",
+                          "haptic", 6)
 
-    model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user1",
-                                    "audio", False)
+    # model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user1",
+    #                                 "audio", False)

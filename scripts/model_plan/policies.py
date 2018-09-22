@@ -234,17 +234,25 @@ class MDPFixedTimePolicy(object):
                         x, y, alp = self.grid_to_xy(xg_next, yg_next, alp_g)
                         self.policy[xg_next, yg_next, alp_g] = wrap_to_pi(np.arctan2(-dy[i], -dx[i]) - alp)
 
-        # self.visualize_policy()
-        # plt.show()
+                        # self.visualize_policy()
+                        # plt.show()
 
     def compute_policy(self, s_g, modality, max_iter=50):
         if self.flag_policy_computed and self.modality == modality:
             goal_diff = np.linalg.norm(self.s_g[:2] - s_g[:2])
-            if goal_diff < 0.5:
+            if goal_diff < 0.25:
                 print "No need to recompute policy"
                 return
 
-        self.s_g = s_g
+        # adjust s_g to be the center of the grid
+        xgg, ygg, tmp = self.xy_to_grid(s_g[0], s_g[1], 0.0)
+        s_g_min = self.grid_to_xy(xgg, ygg, tmp)
+        s_g_max = self.grid_to_xy(xgg+1, ygg+1, tmp)
+
+        self.s_g = 0.5 * (np.asarray(s_g_min) + np.asarray(s_g_max))
+        print self.s_g
+
+        # self.s_g = s_g
         self.modality = modality
 
         if modality == "haptic":
@@ -253,7 +261,6 @@ class MDPFixedTimePolicy(object):
             self.dt = 3.0
 
         self.init_value_function(s_g)
-        xgg, ygg, tmp = self.xy_to_grid(s_g[0], s_g[1], 0.0)
 
         counter_policy_not_updated = 0
         for i in range(max_iter):
@@ -281,6 +288,7 @@ class MDPFixedTimePolicy(object):
                         continue
 
                     x, y, alp = self.grid_to_xy(xg, yg, alp_g)
+                    d = np.linalg.norm(np.array([x, y]) - self.s_g[:2])
 
                     # iterate over all actions
                     Q_max = -1000.0
@@ -296,9 +304,19 @@ class MDPFixedTimePolicy(object):
                         for k in range(self.n_samples):
                             # sample a new state
                             self.tmodel.set_state(x, y, alp)
-                            s_next = self.tmodel.sample_state((modality, a), 0.5, self.dt)
+
+                            if d < 0.5:
+                                s_next = self.tmodel.sample_state((modality, a), 0.5, self.dt,
+                                                                  flag_check_stop=True, s_g=self.s_g)
+                                # if s_next[1] == 2.25:
+                                #     print s_next
+                            else:
+                                s_next = self.tmodel.sample_state((modality, a), 0.5, self.dt)
+
                             if s_next[0] < self.x_range[0] or s_next[0] >= self.x_range[1] or \
                                             s_next[1] < self.y_range[0] or s_next[1] >= self.y_range[1]:
+                                # if d < 0.5:
+                                #     print "wrong!"
                                 Vnext += self.r_obs
                                 n_comm_next += 20
                             else:
@@ -335,8 +353,8 @@ class MDPFixedTimePolicy(object):
             else:
                 counter_policy_not_updated = 0
 
-            # self.visualize_policy()
-            # plt.show()
+                # self.visualize_policy()
+                # plt.show()
 
         self.flag_policy_computed = True
 

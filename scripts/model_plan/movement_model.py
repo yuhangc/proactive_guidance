@@ -56,18 +56,18 @@ class MovementModel(object):
 
         self.params["haptic"].delay = np.log(1.0)
         self.params["haptic"].om = 2.0
-        self.params["haptic"].vd = 0.6
-        self.params["haptic"].std_delay = 0.2
-        self.params["haptic"].std_om = 0.3
-        self.params["haptic"].std_vd = 0.1
+        self.params["haptic"].vd = 0.5
+        self.params["haptic"].std_delay = 0.1
+        self.params["haptic"].std_om = 0.2
+        self.params["haptic"].std_vd = 0.05
         self.params["haptic"].std_vd_heading = 0.05
 
         self.params["audio"].delay = np.log(2.0)
         self.params["audio"].om = 2.0
-        self.params["audio"].vd = 0.6
-        self.params["audio"].std_delay = 0.2
-        self.params["audio"].std_om = 0.3
-        self.params["audio"].std_vd = 0.1
+        self.params["audio"].vd = 0.5
+        self.params["audio"].std_delay = 0.1
+        self.params["audio"].std_om = 0.2
+        self.params["audio"].std_vd = 0.05
         self.params["audio"].std_vd_heading = 0.05
 
     def train(self, data_path):
@@ -83,10 +83,23 @@ class MovementModel(object):
     def set_state(self, x, y, alpha):
         self.s = np.array([x, y, alpha])
 
-    def sample_state(self, a, dt, T):
+    def sample_state(self, a, dt, T, flag_check_stop=False, s_g=None):
         t, traj = self.sample_traj_single_action(a, dt, T)
-        traj[-1, 2] = wrap_to_pi(traj[-1, 2])
-        return traj[-1]
+
+        if flag_check_stop:
+            # check each point in between
+            for point in traj:
+                d = np.linalg.norm(point[:2] - s_g[:2])
+                if d < 0.20:
+                    point[0] = s_g[0]
+                    point[1] = s_g[1]
+                    point[2] = wrap_to_pi(point[2])
+                    return point
+            traj[-1, 2] = wrap_to_pi(traj[-1, 2])
+            return traj[-1]
+        else:
+            traj[-1, 2] = wrap_to_pi(traj[-1, 2])
+            return traj[-1]
 
     def sample_traj_single_action(self, a, dt, T, flag_return_alp=False):
         """
@@ -108,15 +121,28 @@ class MovementModel(object):
         # first sample the delay
         t = self.sample_delay(a)
 
-        if t >= T:
-            # t_traj.append(T)
-            # traj.append(self.s.copy())
-            # return np.asarray(t_traj), np.asarray(traj)
-            print "movement model: this should not happen...\r"
-            t = T * 0.5
+        if t < 0.6:
+            t = 0.6
+        elif t > 1.5:
+            t = 1.5
+        # if t >= T:
+        #     # t_traj.append(T)
+        #     # traj.append(self.s.copy())
+        #     # return np.asarray(t_traj), np.asarray(traj)
+        #     print "movement model: this should not happen...\r"
+        #     t = T * 0.5
+
+        tt = 0.0
+        s = self.s.copy()
+        while tt + dt < t:
+            tt += dt
+            s += np.array([np.cos(self.s[2]), np.sin(self.s[2]), 0.0]) * dt * self.params["haptic"].vd * 0.25
+            t_traj.append(tt)
+            traj.append(s.copy())
 
         t_traj.append(t)
-        traj.append(self.s.copy())
+        s += np.array([np.cos(self.s[2]), np.sin(self.s[2]), 0.0]) * (t-tt) * self.params["haptic"].vd * 0.25
+        traj.append(s.copy())
 
         # sample the "true" direction that human follows
         # ad_mean, ad_std = self.gp_model[a[0]].predict(a[1])[0]
@@ -124,7 +150,7 @@ class MovementModel(object):
         alpha_d = np.random.normal(ad_mean, ad_std) + self.s[2]
 
         # sample turning procedure
-        s_next, dt_turn = self.sample_turning(self.s, (a[0], alpha_d), T - t)
+        s_next, dt_turn = self.sample_turning(s, (a[0], alpha_d), T - t)
 
         t += dt_turn
         t_traj.append(t)
