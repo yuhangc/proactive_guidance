@@ -179,7 +179,7 @@ class PolicyExperiment(object):
         print "preparing to start trial...\r"
 
         self.alp_start = 0.0
-        self.alp_start_cout = 0
+        self.alp_start_count = 0
         
         self.state = "Starting"
         self.t_starting_start = rospy.get_time()

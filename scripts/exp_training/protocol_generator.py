@@ -75,7 +75,7 @@ def generate_free_space_protocol(file_name, n_rep_trial, n_rep_throw):
     np.savetxt(file_name, targets, fmt="%.2f", delimiter=", ")
 
 
-def generate_free_space_protocol2(file_name):
+def generate_free_space_protocol2(file_name, n_policies=2):
     # set parameters
     robot_pose = np.array([0.0, 1.0, 0.0])
     start_pose = np.array([-1.0, 3.0, 1.0])
@@ -98,10 +98,9 @@ def generate_free_space_protocol2(file_name):
         trial_data[2:] = np.array([np.cos(ang), np.sin(ang)]) * target_mag[i] + start_pose[:2] - robot_pose[:2]
 
         for k in range(target_rep[i]):
-            trial_data[1] = 0
-            targets.append(trial_data.copy())
-            trial_data[1] = 1
-            targets.append(trial_data.copy())
+            for p in range(n_policies):
+                trial_data[1] = p
+                targets.append(trial_data.copy())
 
     # randomly shuffle targets
     targets = np.asarray(targets)
@@ -114,5 +113,5 @@ if __name__ == "__main__":
     # generate_naive_random_policy("random_protocol.txt", 5, 8, 3)
     # generate_naive_continuous_random_protocol("random_continuous_protocol_10rep2.txt", 24, 10, 2)
     # generate_free_space_protocol("free_space_exp_protocol_2targets.txt", 5, 2)
-    generate_free_space_protocol2("free_space_exp_protocol_7targets_mixed_train.txt")
+    generate_free_space_protocol2("free_space_exp_protocol_7targets_mixed_train.txt", n_policies=3)
 

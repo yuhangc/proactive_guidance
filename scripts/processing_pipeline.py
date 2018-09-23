@@ -12,7 +12,7 @@ from data_processing.loading import load_save_all
 from model_plan.pre_processing import pre_processing, pre_processing_no_orientation
 from model_plan.gp_model_approx import model_approx_continuous_example, model_approx_create_interp_data
 from model_plan.movement_model import save_default_model
-from model_plan.policies import generate_mdp_policies
+from model_plan.policies import generate_mdp_policies, generate_naive_policies_from_mdp
 from model_plan.simulation import Simulator
 
 
@@ -41,13 +41,17 @@ if __name__ == "__main__":
     modalities = ["haptic", "audio"]
     # modalities = ["audio"]
 
+    user = 7
+    save_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(user)
+
     # process_user(data_path, 6, training_protocol, modalities)
     #
     # save_default_model(6, "../resources/pretrained_models/human_models")
 
-    generate_mdp_policies("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-                          "/home/yuhang/Documents/proactive_guidance/training_data/user6",
-                          "haptic", 6)
+    # generate_mdp_policies("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+    #                       save_path, "haptic", user)
+
+    generate_naive_policies_from_mdp(save_path + "/pretrained_model", "haptic")
 
     # model_approx_continuous_example("/home/yuhang/Documents/proactive_guidance/training_data/user1",
     #                                 "audio", False)

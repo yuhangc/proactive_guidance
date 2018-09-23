@@ -522,6 +522,18 @@ def generate_naive_policies(protocol_file, save_path, modality):
             generated[target_id] = 1.0
 
 
+def generate_naive_policies_from_mdp(policy_path, modality, n_target=7):
+    for target in range(n_target):
+        with open(policy_path + "/mdp_" + modality + "/free_space/target" + str(target) + ".pkl") as f:
+            mdp_policy = pickle.load(f)
+
+        naive_policy = NaivePolicy()
+        naive_policy.compute_policy(mdp_policy.s_g, modality)
+
+        with open(policy_path + "/naive_" + modality + "/free_space/target" + str(target) + ".pkl", "w") as f:
+            pickle.dump(naive_policy, f)
+
+
 def generate_mdp_policies(protocol_file, model_path, modality, usr):
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 

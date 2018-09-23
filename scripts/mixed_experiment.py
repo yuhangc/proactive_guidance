@@ -19,28 +19,30 @@ from exp_training.data_recorder import DataLogger
 from exp_training.utils import getKey
 
 
-class PlannerExperiment(object):
+class MixedExperiment(object):
     def __init__(self):
         # read in configurations
         # create planner
         planner = rospy.get_param("~planner", "mcts")
 
         if planner == "mcts":
-            self.planner = Planner()
+            self.online_planner = Planner()
         else:
-            self.planner = PlannerNaive()
+            self.online_planner = PlannerNaive()
+
+        self.offline_planner = None
 
         # directory that stores the policies for each trial
         self.policy_dir = rospy.get_param("~planner_dir", "mdp_haptic")
 
         # feedback modality
         self.modality = rospy.get_param("~modality", "haptic")
-        self.default_policy = rospy.get_param("~policy", "mdp")
+        self.default_policy = rospy.get_param("~default_policy", "mdp")
         self.env = rospy.get_param("~env", "free_space")
 
         # time interval to update plan
         self.t_plan_last = 0.0
-        self.planner_dt = rospy.get_param("~planner_dt", 1.0)
+        self.planner_dt = rospy.get_param("~planner_dt", 2.0)
         self.t_plan_max = rospy.get_param("~t_plan_max", 0.5)
 
         self.dx_plan_th = rospy.get_param("~dx_plan_th", 0.2)
@@ -50,6 +52,7 @@ class PlannerExperiment(object):
 
         # optimal plan
         self.a_opt = None
+        self.cmd = 0.0
 
         self.s_last_comm = np.array([5.0, 5.0, 0.0])
         self.s_last_alp = None
@@ -188,18 +191,36 @@ class PlannerExperiment(object):
         # load planner
         target_id = int(self.proto_data[self.trial, 0])
 
-        policy_dir = self.policy_dir + "/" + self.default_policy + "_" + self.modality + "/" + self.env
+        policy_id = int(self.proto_data[self.trial, 1])
 
-        with open(policy_dir + "/target" + str(target_id) + ".pkl") as f:
-            default_policy = pickle.load(f)
+        if policy_id == 0:
+            self.trial_policy = "naive"
+        elif policy_id == 1:
+            self.trial_policy = "mdp"
+        else:
+            self.trial_policy = "mcts"
 
-        # load default policy into planner
-        self.planner.create_policy(default_policy, self.modality)
+        if self.trial_policy == "mcts":
+            policy_dir = self.policy_dir + "/" + self.default_policy + "_" + self.modality + "/" + self.env
+
+            with open(policy_dir + "/target" + str(target_id) + ".pkl") as f:
+                default_policy = pickle.load(f)
+
+            # load default policy into planner
+            self.online_planner.create_policy(default_policy, self.modality)
+
+            # reset pos_last_comm
+            self.s_last_comm = np.array([5.0, 5.0, 0.0])
+        else:
+            policy_dir = self.policy_dir + "/" + self.trial_policy + "_" + self.modality + "/" + self.env
+
+            with open(policy_dir + "/target" + str(target_id) + ".pkl") as f:
+                self.offline_planner = pickle.load(f)
 
         print "preparing to start trial...\r"
 
         self.alp_start = 0.0
-        self.alp_start_cout = 0
+        self.alp_start_count = 0
 
         self.state = "Starting"
         self.t_starting_start = rospy.get_time()
@@ -209,13 +230,88 @@ class PlannerExperiment(object):
             if self.flag_compute_plan:
                 self.flag_compute_plan = False
 
-                self.a_opt = self.planner.compute_plan(t_max=self.t_plan_max,
-                                                       flag_with_prediction=True,
-                                                       flag_wait_for_t_max=True)
+                self.a_opt = self.online_planner.compute_plan(t_max=self.t_plan_max,
+                                                              flag_with_prediction=True,
+                                                              flag_wait_for_t_max=True)
                 self.flag_plan_generated = True
             else:
                 # simply do nothing?
                 pass
+
+    def run_offline_policy(self, pose, flag_stop):
+        if not flag_stop and rospy.get_time() - self.t_plan_last >= self.planner_dt + 0.5 * np.abs(self.cmd):
+            # compute and send policy
+            self.cmd = self.offline_planner.sample_policy(pose)
+            print "cmd is: ", np.rad2deg(self.cmd), ", pose is: ", pose, "\r"
+
+            # convert to right format and publish
+            self.publish_haptic_control([self.convert_feedback(self.cmd), 2])
+
+            # log the feedback
+            self.logger.log_comm(rospy.get_time() - self.t_trial_start, self.cmd)
+
+            self.t_plan_last = rospy.get_time()
+
+    def run_online_policy(self, pose, flag_stop):
+        # update planner measurement
+        t_curr = rospy.get_time()
+        if t_curr - self.t_meas_last > self.meas_update_dt:
+            self.online_planner.update_state(pose, t_curr)
+            self.t_meas_last = t_curr
+
+            self.logger.log_extra(t_curr-self.t_trial_start,
+                                  [self.online_planner.alp_d_mean,
+                                   self.online_planner.alp_d_cov,
+                                   self.online_planner.v])
+
+            # print "pose is: ", pose, "\r
+
+        # update alpha estimate
+        if self.s_last_alp is not None:
+            dx_alp = np.linalg.norm(pose[:2] - self.s_last_alp[:2])
+            if dx_alp >= self.dx_alp_th:
+                self.online_planner.update_alp(pose)
+                self.s_last_alp = pose.copy()
+        else:
+            self.s_last_alp = pose.copy()
+
+        # print "flag_stop is: ", flag_stop, "flag_is_waiting is: ", self.flag_is_waiting, "\r"
+        if not flag_stop and not self.flag_is_waiting:
+            dx = np.linalg.norm(pose[:2] - self.s_last_comm[:2])
+            # print "dx is: ", dx, "\r"
+
+            # minimum 2 second interval and position has changed
+            if t_curr - self.t_plan_last >= self.planner_dt - self.t_plan_max + + 0.5 * np.abs(self.cmd) \
+                    and dx > self.dx_plan_th:
+                print "prepare to compute plan...\r"
+                # first update alpha
+                self.online_planner.update_alp(pose)
+                self.s_last_alp = pose.copy()
+
+                # tell planner thread to start plan
+                self.flag_compute_plan = True
+
+                # wait for plan
+                self.flag_is_waiting = True
+
+        if self.flag_is_waiting and self.flag_plan_generated:
+            print "got plan\r"
+            self.flag_plan_generated = False
+            self.flag_is_waiting = False
+
+            if self.a_opt is not None:
+                self.cmd = self.a_opt
+                self.online_planner.execute_plan(pose, self.a_opt)
+                print "action is: ", self.a_opt, "state is: ", pose, "\r"
+
+                # convert to right format and publish
+                self.publish_haptic_control([self.convert_feedback(self.a_opt), 2])
+
+                # log the feedback
+                self.logger.log_comm(rospy.get_time() - self.t_trial_start, self.a_opt)
+
+                self.t_plan_last = rospy.get_time()
+                self.s_last_comm = pose.copy()
 
     def _exp_thread(self, trial_start):
         self.trial = trial_start
@@ -295,60 +391,10 @@ class PlannerExperiment(object):
                     self.state = "Resetting"
                     flag_stop = True
 
-                # update planner measurement
-                t_curr = rospy.get_time()
-                if t_curr - self.t_meas_last > self.meas_update_dt:
-                    self.planner.update_state(pose, t_curr)
-                    self.t_meas_last = t_curr
-
-                    self.logger.log_extra(t_curr-self.t_trial_start, [self.planner.alp_d_mean, self.planner.alp_d_cov, self.planner.v])
-
-                    # print "pose is: ", pose, "\r
-
-                # update alpha estimate
-                if self.s_last_alp is not None:
-                    dx_alp = np.linalg.norm(pose[:2] - self.s_last_alp[:2])
-                    if dx_alp >= self.dx_alp_th:
-                        self.planner.update_alp(pose)
-                        self.s_last_alp = pose.copy()
+                if self.trial_policy == "mcts":
+                    self.run_online_policy(pose, flag_stop)
                 else:
-                    self.s_last_alp = pose.copy()
-
-                # print "flag_stop is: ", flag_stop, "flag_is_waiting is: ", self.flag_is_waiting, "\r"
-                if not flag_stop and not self.flag_is_waiting:
-                    dx = np.linalg.norm(pose[:2] - self.s_last_comm[:2])
-                    # print "dx is: ", dx, "\r"
-
-                    # minimum 1 second interval and position has changed
-                    if t_curr - self.t_plan_last >= self.planner_dt - self.t_plan_max and dx > self.dx_plan_th:
-                        print "prepare to compute plan...\r"
-                        # first update alpha
-                        self.planner.update_alp(pose)
-                        self.s_last_alp = pose.copy()
-
-                        # tell planner thread to start plan
-                        self.flag_compute_plan = True
-
-                        # wait for plan
-                        self.flag_is_waiting = True
-
-                if self.flag_is_waiting and self.flag_plan_generated:
-                    print "got plan\r"
-                    self.flag_plan_generated = False
-                    self.flag_is_waiting = False
-
-                    if self.a_opt is not None:
-                        self.planner.execute_plan(pose, self.a_opt)
-                        print "action is: ", self.a_opt, "state is: ", pose, "\r"
-
-                        # convert to right format and publish
-                        self.publish_haptic_control([self.convert_feedback(self.a_opt), 2])
-
-                        # log the feedback
-                        self.logger.log_comm(rospy.get_time() - self.t_trial_start, self.a_opt)
-
-                        self.t_plan_last = rospy.get_time()
-                        self.s_last_comm = pose.copy()
+                    self.run_offline_policy(pose, flag_stop)
 
             elif self.state == "Resetting":
                 # wait for some time or user input to start the next trial
@@ -396,5 +442,5 @@ if __name__ == "__main__":
 
     trial_start = rospy.get_param("~trial_start", 0)
 
-    exp = PlannerExperiment()
+    exp = MixedExperiment()
     exp.run(trial_start)
