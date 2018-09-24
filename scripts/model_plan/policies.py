@@ -86,7 +86,7 @@ class MDPFixedTimePolicy(object):
         self.n_update_th = 3
 
         # how many samples to draw for each update
-        self.n_samples = 10
+        self.n_samples = 20
 
         # transition model for sampling
         self.tmodel = tmodel
@@ -312,7 +312,7 @@ class MDPFixedTimePolicy(object):
                         Vnext = 0.0
                         n_comm_next = 0.0
 
-                        if i < max_iter-5:
+                        if i < max_iter-0:
                             n_samples = self.n_samples
                         else:
                             n_samples = 2 * self.n_samples
