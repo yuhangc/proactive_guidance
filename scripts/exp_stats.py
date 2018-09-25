@@ -5,29 +5,23 @@ import matplotlib.pyplot as plt
 import pickle
 
 
-def free_space_test_stats(root_path, protocol_file, user):
+def mixed_exp_stats(root_path, protocol_file, user):
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 
     n_trial = len(protocol_data)
     n_target = int(max(protocol_data[:, 0])) + 1
 
     # load the naive/mdp data
-    with open(root_path + "/test_free_space/user" + str(user) + "/traj_raw.pkl") as f:
-        traj_naive, traj_mdp = pickle.load(f)
+    with open(root_path + "/user" + str(user) + "/traj_raw.pkl") as f:
+        traj_all = pickle.load(f)
 
-    with open(root_path + "/test_free_space/user" + str(user) + "/comm_raw.pkl") as f:
-        comm_naive, comm_mdp = pickle.load(f)
-
-    with open(root_path + "/planner_exp/user" + str(user) + "/traj_raw.pkl") as f:
-        traj_mcts = pickle.load(f)
-
-    with open(root_path + "/planner_exp/user" + str(user) + "/comm_raw.pkl") as f:
-        comm_mcts = pickle.load(f)
+    with open(root_path + "/user" + str(user) + "/comm_raw.pkl") as f:
+        comm_all = pickle.load(f)
 
     # compute the number of communication
     cond_all = ["naive", "MDP", "MCTS"]
-    comm_all = [comm_naive, comm_mdp, comm_mcts]
-    traj_all = [traj_naive, traj_mdp, traj_mcts]
+    # comm_all = [comm_naive, comm_mdp, comm_mcts]
+    # traj_all = [traj_naive, traj_mdp, traj_mcts]
 
     n_cond = len(cond_all)
     n_comm = np.zeros((n_cond, n_target))
@@ -89,6 +83,6 @@ def free_space_test_stats(root_path, protocol_file, user):
 
 
 if __name__ == "__main__":
-    free_space_test_stats("/home/yuhang/Documents/proactive_guidance",
-                          "../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-                          0)
+    mixed_exp_stats("/home/yuhang/Documents/proactive_guidance/planner_exp",
+                    "../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+                    7)

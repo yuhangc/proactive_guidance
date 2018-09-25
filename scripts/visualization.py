@@ -7,7 +7,7 @@ import matplotlib.patches as mpatches
 
 import pickle
 
-from model_plan.policies import validate_free_space_policy
+from model_plan.policies import validate_free_space_policy, mkdir_p
 from model_plan.simulation import Simulator
 from model_plan.policies import NaivePolicy, MDPFixedTimePolicy
 from model_plan.policies import simulate_naive_policy
@@ -73,7 +73,8 @@ def compute_traj_stats(traj_list, s_init, s_goal):
     return np.asarray(traj_avg_rotated), np.asarray(traj_ub), np.asarray(traj_lb)
 
 
-def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30, modality="haptic", style="cov"):
+def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30,
+                          modality="haptic", style="cov", flag_save=False):
     # load the protocol
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 
@@ -136,7 +137,12 @@ def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30, modality
 
         axes.axis("equal")
 
-    plt.show()
+    if flag_save:
+        save_path = "/home/yuhang/Documents/proactive_guidance/figures/modeling/user" + str(usr)
+        mkdir_p(save_path)
+        fig.savefig(save_path + "/" + policy + "_policy.jpg")
+    else:
+        plt.show()
 
 
 def visualize_policy_diff(p1_file, p2_file):
@@ -222,10 +228,10 @@ def visualize_naive_mdp_policy_diff(root_path, user, target):
 
 
 if __name__ == "__main__":
-    # s_init = np.array([-1.0, 2.0, 0.0])
-    # visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-    #                       4, "mdp", s_init)
+    s_init = np.array([-1.0, 2.0, 0.0])
+    visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+                          5, "mdp", s_init, flag_save=True)
 
     # simulate_naive_policy(30, np.array([2.46, 4.00, 0.0]), "haptic", 3)
 
-    visualize_naive_mdp_policy_diff("/home/yuhang/Documents/proactive_guidance/training_data", 4, 0)
+    # visualize_naive_mdp_policy_diff("/home/yuhang/Documents/proactive_guidance/training_data", 4, 0)

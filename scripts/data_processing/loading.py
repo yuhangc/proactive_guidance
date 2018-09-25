@@ -207,36 +207,39 @@ def visualize_free_space_test_mixed(root_path, protocol_file):
     plt.show()
 
 
-def load_free_space_test_mixed(root_path, protocol_file):
+def load_free_space_test_mixed(root_path, protocol_file, n_cond=3):
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+    cond=["naive", "optimized", "as needed"]
 
     n_trial = len(protocol_data)
 
     n_target = int(max(protocol_data[:, 0])) + 1
 
-    traj_naive = [[] for i in range(n_target)]
-    traj_mdp = [[] for i in range(n_target)]
-    comm_naive = [[] for i in range(n_target)]
-    comm_mdp = [[] for i in range(n_target)]
-    for trial in range(n_trial):
-        data = np.loadtxt(root_path + "/trial" + str(trial) + ".txt", delimiter=", ")
-        comm_data = np.loadtxt(root_path + "/trial" + str(trial) + "_comm.txt", delimiter=", ")
+    traj_all = []
+    comm_all = []
 
+    for i in range(n_cond):
+        traj_cond = [[] for i in range(n_target)]
+        comm_cond = [[] for i in range(n_target)]
+        traj_all.append(traj_cond)
+        comm_all.append(comm_cond)
+
+    for trial in range(n_trial):
+        data = np.loadtxt(root_path + "/trials/trial" + str(trial) + ".txt", delimiter=", ")
+        comm_data = np.loadtxt(root_path + "/trials/trial" + str(trial) + "_comm.txt", delimiter=", ")
+
+        cond = int(protocol_data[trial, 1])
         target_id = int(protocol_data[trial, 0])
         traj = data
 
-        if protocol_data[trial, 1] == 0:
-            traj_naive[target_id].append(traj)
-            comm_naive[target_id].append(comm_data)
-        else:
-            traj_mdp[target_id].append(traj)
-            comm_mdp[target_id].append(comm_data)
+        traj_all[cond][target_id].append(traj)
+        comm_all[cond][target_id].append(comm_data)
 
     with open(root_path + "/traj_raw.pkl", "w") as f:
-        pickle.dump((traj_naive, traj_mdp), f)
+        pickle.dump(traj_all, f)
 
     with open(root_path + "/comm_raw.pkl", "w") as f:
-        pickle.dump((comm_naive, comm_mdp), f)
+        pickle.dump(comm_all, f)
 
 
 def load_planner_exp(root_path, protocol_file):
@@ -265,6 +268,55 @@ def load_planner_exp(root_path, protocol_file):
         pickle.dump(comm_list, f)
 
 
+def visualize_mixed_exp(root_path, protocol_file):
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+
+    n_trial = len(protocol_data)
+
+    # generate a color map
+    n_colors = int(np.max(protocol_data[:, 0]))
+    cm = plt.get_cmap("gist_rainbow")
+
+    n_cond = 3
+    cond = ["naive", "optimized", "as needed"]
+    pose_all = [[] for i in range(n_cond)]
+
+    fig, axes = plt.subplots(1, n_cond, figsize=(16, 5))
+
+    for trial in range(n_trial):
+        data = np.loadtxt(root_path + "/trials/trial" + str(trial) + ".txt", delimiter=", ")
+        traj = data[:, 1:]
+
+        # extend the traj a little for visual effect
+        s = traj[-1].copy()
+        s_g = protocol_data[trial, 2:]
+
+        d = np.linalg.norm(s[:2] - s_g)
+        if d >= 0.3:
+            th = np.arctan2(s_g[1] - s[1], s_g[0] - s[0])
+            s += np.array([np.cos(th), np.sin(th), 0.0, 0.0, 0.0]) * 0.1
+            traj = np.vstack((traj, s.reshape(1, -1)))
+
+        pid = protocol_data[trial, 1]
+        axes[pid].plot(traj[:, 0], traj[:, 1], color=cm(1. * protocol_data[trial, 0] / n_colors))
+
+    # plot the goals
+    visited = np.zeros((100, ))
+    for trial in range(n_trial):
+        trial_id = int(protocol_data[trial, 0])
+        if visited[trial_id] < 1.0:
+            visited[trial_id] = 1.0
+            for i in range(n_cond):
+                circ = Circle((protocol_data[trial, 2], protocol_data[trial, 3]), radius=0.35, facecolor='r', alpha=0.3)
+                axes[i].add_patch(circ)
+
+    for i in range(n_cond):
+        axes[i].axis("equal")
+        axes[i].set_title(cond[i])
+
+    plt.show()
+
+
 if __name__ == "__main__":
     # load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/test1-0830",
     #               "../../resources/protocols/random_continuous_protocol_10rep2.txt",
@@ -280,10 +332,16 @@ if __name__ == "__main__":
     # visualize_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/test_free_space/user0",
     #                                 "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
-    load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/test_free_space/user3",
-                               "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
-
-    load_planner_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
-                     "../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt")
+    # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/test_free_space/user3",
+    #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+    #
+    # load_planner_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
+    #                  "../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt")
 
     # load_random_guidance_exp("/home/yuhang/Documents/proactive_guidance/training_data/user0/random_guidance", 30)
+
+    visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user7",
+                        "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+
+    # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user7",
+    #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
