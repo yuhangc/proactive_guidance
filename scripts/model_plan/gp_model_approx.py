@@ -45,7 +45,7 @@ class GPModelApproxBase(object):
             #                                                          n_restarts_optimizer=3))
             gp_mean.append(gaussian_process.GaussianProcessRegressor(kernel=1.0 * RBF(length_scale=1.0) +
                                                                             0.1 *
-                                                                            WhiteKernel(0.1, noise_level_bounds=(0.01, 0.2)),
+                                                                            WhiteKernel(0.1, noise_level_bounds=(0.01, 0.25)),
                                                                      n_restarts_optimizer=3))
 
             # gp_std.append(gaussian_process.GaussianProcessRegressor(kernel=1.0 * RBF(length_scale=0.3) +
