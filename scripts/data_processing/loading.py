@@ -6,6 +6,10 @@ import pickle
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 
+from matplotlib import rcParams
+rcParams['font.family'] = 'serif'
+rcParams['font.serif'] = ['Times New Roman']
+
 
 def wrap_to_pi(ang):
     return (ang + np.pi) % (2 * np.pi) - np.pi
@@ -301,10 +305,10 @@ def visualize_mixed_exp(root_path, protocol_file):
 
     n_cond = 3
     n_target = 7
-    cond_name = ["naive", "optimized", "as needed"]
+    cond_name = ["Naive", "Optimized", "As Needed"]
     # pose_all = [[] for i in range(n_cond)]
 
-    fig, axes = plt.subplots(1, n_cond, figsize=(16, 5))
+    fig, axes = plt.subplots(1, n_cond, figsize=(13, 5))
 
     # plot the goals
     target_pos = np.zeros((n_target, 2))
@@ -317,7 +321,7 @@ def visualize_mixed_exp(root_path, protocol_file):
             target_pos[trial_id] = protocol_data[trial, 2:4]
             for i in range(n_cond):
                 circ = Circle((protocol_data[trial, 2], protocol_data[trial, 3]),
-                              radius=0.35, facecolor='w', alpha=1.0, edgecolor='k')
+                              radius=0.35, facecolor='k', alpha=0.15, lw=0)
                 axes[i].add_patch(circ)
 
     with open(root_path + "/traj_raw.pkl") as f:
@@ -330,10 +334,10 @@ def visualize_mixed_exp(root_path, protocol_file):
                 s = traj[-1].copy()
                 s_g = target_pos[target]
 
-                d = np.linalg.norm(s[:2] - s_g)
+                d = np.linalg.norm(s[1:3] - s_g)
                 if d >= 0.3:
-                    th = np.arctan2(s_g[1] - s[1], s_g[0] - s[0])
-                    s += np.array([np.cos(th), np.sin(th), 0.0, 0.0, 0.0, 0.0]) * 0.1
+                    th = np.arctan2(s_g[1] - s[2], s_g[0] - s[1])
+                    s += np.array([1.0, np.cos(th), np.sin(th), 0.0, 0.0, 0.0]) * 0.1
                     traj = np.vstack((traj, s.reshape(1, -1)))
 
                 axes[cond].plot(traj[:, 1], traj[:, 2], color=cm(1. * target / n_colors))
@@ -356,8 +360,20 @@ def visualize_mixed_exp(root_path, protocol_file):
     #     axes[pid].plot(traj[:, 0], traj[:, 1], color=cm(1. * protocol_data[trial, 0] / n_colors))
 
     for i in range(n_cond):
+        axes[i].set_title(cond_name[i], fontsize=16)
+
+    fig.tight_layout()
+
+    for i in range(n_cond):
         axes[i].axis("equal")
-        axes[i].set_title(cond_name[i])
+        axes[i].set_title(cond_name[i], fontsize=16)
+        axes[i].set_xlim(-1.5, 4.5)
+        axes[i].set_ylim(-1.5, 5.5)
+
+        for tick in axes[i].xaxis.get_major_ticks():
+            tick.label.set_fontsize(14)
+        for tick in axes[i].yaxis.get_major_ticks():
+            tick.label.set_fontsize(14)
 
     plt.show()
 
@@ -385,11 +401,11 @@ if __name__ == "__main__":
 
     # load_random_guidance_exp("/home/yuhang/Documents/proactive_guidance/training_data/user0/random_guidance", 30)
 
-    visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
-                        "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+    # visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
+    #                     "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
-    # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user7",
-    #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+    load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user4",
+                               "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
     # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
     #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed2.txt",

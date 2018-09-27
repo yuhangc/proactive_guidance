@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
+from model_plan.plotting_utils import *
+
 
 def mixed_exp_stats(root_path, protocol_file, user):
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
@@ -19,7 +21,7 @@ def mixed_exp_stats(root_path, protocol_file, user):
         comm_all = pickle.load(f)
 
     # compute the number of communication
-    cond_all = ["naive", "MDP", "MCTS"]
+    cond_all = ["Naive", "Optimized", "As Needed"]
     # comm_all = [comm_naive, comm_mdp, comm_mcts]
     # traj_all = [traj_naive, traj_mdp, traj_mcts]
 
@@ -67,18 +69,23 @@ def mixed_exp_stats(root_path, protocol_file, user):
                     'capsize': 2.5,
                     'capthick': 1}
 
-    data_plot = [(n_comm_mean, n_comm_std, "# communication"),
-                 (tf_mean, tf_std, "trial time"),
-                 (path_len_mean, path_len_std, "path length")]
+    data_plot = [(n_comm_mean, n_comm_std, "# of Communication"),
+                 (tf_mean, tf_std, "Trial Time (s)"),
+                 (path_len_mean, path_len_std, "Path Length (m)")]
 
     for i, data_point in enumerate(data_plot):
         data_mean, data_std, label = data_point
         axes[i].bar(index, data_mean, bar_width, alpha=opacity, color=(34/255.0, 144/255.0, 196/255.0),
                     yerr=data_std, error_kw=error_config)
         axes[i].set_xticks(index + bar_width / 2)
-        axes[i].set_xticklabels(cond_all, fontsize=12)
-        axes[i].set_ylabel(label)
+        axes[i].set_xticklabels(cond_all, fontsize=16)
+        axes[i].set_ylabel(label, fontsize=16)
+        axes[i].set_xlim(-0.25, 2.5)
 
+        turn_off_box(axes[i])
+        set_tick_size(axes[i], 14)
+
+    fig.tight_layout()
     plt.show()
 
 
