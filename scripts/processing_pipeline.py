@@ -79,7 +79,7 @@ if __name__ == "__main__":
     modalities = ["haptic", "audio"]
     # modalities = ["audio"]
 
-    user = 7
+    user = 3
     save_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(user)
 
     # process_user(data_path, 6, training_protocol, modalities)
@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
     # generate_naive_policies_from_mdp(save_path + "/pretrained_model", "haptic")
 
-    # model_approx_continuous_example(save_path, "haptic", False)
+    model_approx_continuous_example(save_path, "haptic", False)
 
     users = range(10)
-    train_unified_model(data_path, users)
+    # train_unified_model(data_path, users)

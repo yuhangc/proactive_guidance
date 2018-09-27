@@ -207,7 +207,7 @@ def visualize_free_space_test_mixed(root_path, protocol_file):
     plt.show()
 
 
-def load_free_space_test_mixed(root_path, protocol_file, n_cond=3):
+def load_free_space_test_mixed(root_path, protocol_file, n_cond=3, flag_all_mixed=True, mcts_proto=None):
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
     cond=["naive", "optimized", "as needed"]
 
@@ -224,9 +224,14 @@ def load_free_space_test_mixed(root_path, protocol_file, n_cond=3):
         traj_all.append(traj_cond)
         comm_all.append(comm_cond)
 
+    if flag_all_mixed:
+        load_path = root_path + "/trials"
+    else:
+        load_path = root_path + "/naive_mdp"
+
     for trial in range(n_trial):
-        data = np.loadtxt(root_path + "/trials/trial" + str(trial) + ".txt", delimiter=", ")
-        comm_data = np.loadtxt(root_path + "/trials/trial" + str(trial) + "_comm.txt", delimiter=", ")
+        data = np.loadtxt(load_path + "/trial" + str(trial) + ".txt", delimiter=", ")
+        comm_data = np.loadtxt(load_path + "/trial" + str(trial) + "_comm.txt", delimiter=", ")
 
         cond = int(protocol_data[trial, 1])
         target_id = int(protocol_data[trial, 0])
@@ -234,6 +239,23 @@ def load_free_space_test_mixed(root_path, protocol_file, n_cond=3):
 
         traj_all[cond][target_id].append(traj)
         comm_all[cond][target_id].append(comm_data)
+
+    if not flag_all_mixed:
+        # separately load the mcts case
+        protocol_data = np.loadtxt(mcts_proto, delimiter=", ")
+        n_trial = len(protocol_data)
+
+        load_path = root_path + "/mcts"
+
+        for trial in range(n_trial):
+            data = np.loadtxt(load_path + "/trial" + str(trial) + ".txt", delimiter=", ")
+            comm_data = np.loadtxt(load_path + "/trial" + str(trial) + "_comm.txt", delimiter=", ")
+
+            target_id = int(protocol_data[trial, 0])
+            traj = data
+
+            traj_all[2][target_id].append(traj)
+            comm_all[2][target_id].append(comm_data)
 
     with open(root_path + "/traj_raw.pkl", "w") as f:
         pickle.dump(traj_all, f)
@@ -278,41 +300,64 @@ def visualize_mixed_exp(root_path, protocol_file):
     cm = plt.get_cmap("gist_rainbow")
 
     n_cond = 3
-    cond = ["naive", "optimized", "as needed"]
-    pose_all = [[] for i in range(n_cond)]
+    n_target = 7
+    cond_name = ["naive", "optimized", "as needed"]
+    # pose_all = [[] for i in range(n_cond)]
 
     fig, axes = plt.subplots(1, n_cond, figsize=(16, 5))
 
-    for trial in range(n_trial):
-        data = np.loadtxt(root_path + "/trials/trial" + str(trial) + ".txt", delimiter=", ")
-        traj = data[:, 1:]
-
-        # extend the traj a little for visual effect
-        s = traj[-1].copy()
-        s_g = protocol_data[trial, 2:]
-
-        d = np.linalg.norm(s[:2] - s_g)
-        if d >= 0.3:
-            th = np.arctan2(s_g[1] - s[1], s_g[0] - s[0])
-            s += np.array([np.cos(th), np.sin(th), 0.0, 0.0, 0.0]) * 0.1
-            traj = np.vstack((traj, s.reshape(1, -1)))
-
-        pid = protocol_data[trial, 1]
-        axes[pid].plot(traj[:, 0], traj[:, 1], color=cm(1. * protocol_data[trial, 0] / n_colors))
-
     # plot the goals
+    target_pos = np.zeros((n_target, 2))
     visited = np.zeros((100, ))
+
     for trial in range(n_trial):
         trial_id = int(protocol_data[trial, 0])
         if visited[trial_id] < 1.0:
             visited[trial_id] = 1.0
+            target_pos[trial_id] = protocol_data[trial, 2:4]
             for i in range(n_cond):
-                circ = Circle((protocol_data[trial, 2], protocol_data[trial, 3]), radius=0.35, facecolor='r', alpha=0.3)
+                circ = Circle((protocol_data[trial, 2], protocol_data[trial, 3]),
+                              radius=0.35, facecolor='w', alpha=1.0, edgecolor='k')
                 axes[i].add_patch(circ)
+
+    with open(root_path + "/traj_raw.pkl") as f:
+        traj_data = pickle.load(f)
+
+    for cond in range(n_cond):
+        for target in range(n_target):
+            for traj in traj_data[cond][target]:
+                # extend the traj a little for visual effect
+                s = traj[-1].copy()
+                s_g = target_pos[target]
+
+                d = np.linalg.norm(s[:2] - s_g)
+                if d >= 0.3:
+                    th = np.arctan2(s_g[1] - s[1], s_g[0] - s[0])
+                    s += np.array([np.cos(th), np.sin(th), 0.0, 0.0, 0.0, 0.0]) * 0.1
+                    traj = np.vstack((traj, s.reshape(1, -1)))
+
+                axes[cond].plot(traj[:, 1], traj[:, 2], color=cm(1. * target / n_colors))
+
+    # for trial in range(n_trial):
+    #     data = np.loadtxt(root_path + "/trials/trial" + str(trial) + ".txt", delimiter=", ")
+    #     traj = data[:, 1:]
+    #
+    #     # extend the traj a little for visual effect
+    #     s = traj[-1].copy()
+    #     s_g = protocol_data[trial, 2:]
+    #
+    #     d = np.linalg.norm(s[:2] - s_g)
+    #     if d >= 0.3:
+    #         th = np.arctan2(s_g[1] - s[1], s_g[0] - s[0])
+    #         s += np.array([np.cos(th), np.sin(th), 0.0, 0.0, 0.0]) * 0.1
+    #         traj = np.vstack((traj, s.reshape(1, -1)))
+    #
+    #     pid = protocol_data[trial, 1]
+    #     axes[pid].plot(traj[:, 0], traj[:, 1], color=cm(1. * protocol_data[trial, 0] / n_colors))
 
     for i in range(n_cond):
         axes[i].axis("equal")
-        axes[i].set_title(cond[i])
+        axes[i].set_title(cond_name[i])
 
     plt.show()
 
@@ -340,8 +385,13 @@ if __name__ == "__main__":
 
     # load_random_guidance_exp("/home/yuhang/Documents/proactive_guidance/training_data/user0/random_guidance", 30)
 
-    visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user7",
+    visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
                         "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
     # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user7",
     #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+
+    # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
+    #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed2.txt",
+    #                            flag_all_mixed=False,
+    #                            mcts_proto="../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt")

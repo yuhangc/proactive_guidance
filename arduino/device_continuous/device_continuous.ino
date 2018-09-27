@@ -27,7 +27,7 @@ static const float a5 = 20.00;     // spacing between motors
 static const int power_ctrl_pin = 35;
 
 static const float servo_offset_left = 3;
-static const float servo_offset_right = -1;
+static const float servo_offset_right = 1;
 
 static const int servo_pin_left = SERVO_PIN_A;
 static const int servo_pin_right = SERVO_PIN_B;
