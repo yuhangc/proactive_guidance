@@ -18,7 +18,7 @@ from model_plan.simulation import Simulator
 
 
 def process_user(root_path, usr, training_protocol, modalities):
-    offsets = {"haptic": -0.25, "audio": -0.35}
+    offsets = {"haptic": 0.1, "audio": -0.1}
 
     for modality in modalities:
         load_save_all(root_path + "/user" + str(usr) + "/" + modality,
@@ -69,7 +69,7 @@ def train_unified_model(root_path, users):
     mmodel.load_model(root_path + "/unified")
     mmodel.set_default_param()
 
-    with open("../resources/pretrained_models/human_models/unified_default.pkl", "w") as f:
+    with open("../resources/pretrained_models/human_models/user_unified_default.pkl", "w") as f:
         pickle.dump(mmodel, f)
 
 
@@ -80,18 +80,19 @@ if __name__ == "__main__":
     # modalities = ["audio"]
 
     user = 3
+
     save_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(user)
 
-    # process_user(data_path, 6, training_protocol, modalities)
+    # process_user(data_path, user, training_protocol, modalities)
     #
-    # save_default_model(6, "../resources/pretrained_models/human_models")
+    # save_default_model(user, "../resources/pretrained_models/human_models")
 
-    # generate_mdp_policies("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-    #                       save_path, "haptic", user)
+    generate_mdp_policies("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+                          save_path, "haptic", user)
 
     # generate_naive_policies_from_mdp(save_path + "/pretrained_model", "haptic")
 
     model_approx_continuous_example(save_path, "haptic", False)
 
-    users = range(10)
+    # users = range(10
     # train_unified_model(data_path, users)

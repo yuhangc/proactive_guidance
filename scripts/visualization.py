@@ -74,7 +74,7 @@ def compute_traj_stats(traj_list, s_init, s_goal):
 
 
 def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30,
-                          modality="haptic", style="cov", flag_save=False):
+                          modality="haptic", style="cov", flag_save=False, flag_unified_policy=False):
     # load the protocol
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 
@@ -92,8 +92,12 @@ def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30,
 
     for target in targets:
         # load policy
-        policy_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(usr) + \
-                      "/pretrained_model/" + policy + "_" + modality + "/free_space"
+        if flag_unified_policy:
+            policy_path = "/home/yuhang/Documents/proactive_guidance/training_data/user_unified" + \
+                          "/pretrained_model/" + policy + "_" + modality + "/free_space"
+        else:
+            policy_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(usr) + \
+                          "/pretrained_model/" + policy + "_" + modality + "/free_space"
         with open(policy_path + "/target" + str(target) + ".pkl") as f:
             planner = pickle.load(f)
 
@@ -140,7 +144,10 @@ def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30,
     if flag_save:
         save_path = "/home/yuhang/Documents/proactive_guidance/figures/modeling/user" + str(usr)
         mkdir_p(save_path)
-        fig.savefig(save_path + "/" + policy + "_policy.jpg")
+        if flag_unified_policy:
+            fig.savefig(save_path + "/unified_policy.jpg")
+        else:
+            fig.savefig(save_path + "/" + policy + "_policy.jpg")
     else:
         plt.show()
 
@@ -230,7 +237,10 @@ def visualize_naive_mdp_policy_diff(root_path, user, target):
 if __name__ == "__main__":
     s_init = np.array([-1.0, 2.0, 0.0])
     visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-                          5, "mdp", s_init, flag_save=True)
+                          10, "naive", s_init, flag_save=True)
+
+    # visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+    #                       10, "mdp", s_init, flag_save=True, flag_unified_policy=True)
 
     # simulate_naive_policy(30, np.array([2.46, 4.00, 0.0]), "haptic", 3)
 
