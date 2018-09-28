@@ -503,6 +503,28 @@ def validate_free_space_policy(planner, s_g, modality, path, model_path):
     fig.savefig(path + "/simulation.png")
 
 
+def validate_obs_policy(planner, s_g, modality, path, model_path):
+    fig, axes = plt.subplots()
+    planner.visualize_policy(axes)
+    fig.savefig(path + "/value_func.png")
+
+    sim = Simulator(planner, model_path)
+    n_trials = 30
+
+    traj_list = []
+    for i in range(n_trials):
+        traj_list.append(sim.run_trial((-2.0, 0.5, 0.25 * np.pi), s_g, modality, 30.0, tol=0.5))
+
+    fig, axes = plt.subplots()
+    for i in range(n_trials):
+        t, traj = traj_list[i]
+        axes.plot(traj[:, 0], traj[:, 1])
+    axes.axis("equal")
+
+    axes.scatter(s_g[0], s_g[1], facecolor='r')
+    fig.savefig(path + "/simulation.png")
+
+
 def generate_naive_policies(protocol_file, save_path, modality):
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 
@@ -568,6 +590,39 @@ def generate_mdp_policies(protocol_file, model_path, modality, usr):
                                        model_path)
 
             generated[target_id] = 1.0
+
+
+def generate_mdp_policies_with_obs(env_list, model_path, modality, usr):
+    n_targets = len(env_list)
+
+    save_path = model_path + "/user" + str(usr) + "/pretrained_model/mdp_" + modality + "/obstacle"
+
+    ranges = [[-3.0, 4.5], [-1.0, 6.0]]
+
+    for i in range(n_targets):
+        target_pos, obs_list = env_list[i]
+
+        # load human model first
+        with open("../resources/pretrained_models/human_models/user" + str(usr) + "_default.pkl") as f:
+            human_model = pickle.load(f)
+
+        # create the planner
+        mdp_policy = MDPFixedTimePolicy(human_model, ranges)
+        mdp_policy.gen_env(obs_list)
+
+        # compute policy
+        s_g = np.array([target_pos[0], target_pos[1], 0.0])
+        mdp_policy.compute_policy(s_g, modality, max_iter=20)
+
+        mkdir_p(save_path)
+        with open(save_path + "/target" + str(i) + ".pkl", "w") as f:
+            pickle.dump(mdp_policy, f)
+
+        # save some figures for debug
+        fig_path = save_path + "/target" + str(i) + "_figs"
+        mkdir_p(fig_path)
+        validate_obs_policy(mdp_policy, s_g, modality, fig_path,
+                            model_path + "/user" + str(usr))
 
 
 def mkdir_p(mypath):

@@ -109,9 +109,32 @@ def generate_free_space_protocol2(file_name, n_policies=2):
     np.savetxt(file_name, targets, fmt="%.2f", delimiter=", ")
 
 
+def generate_obs_protocol(file_name, n_policies=3, n_rep=7):
+    targets_all = [[1.5, 4.5], [2.5, 3.5], [3.5, 2]]
+
+    protocol = []
+
+    for i, target in enumerate(targets_all):
+        for policy in range(n_policies):
+            for rep in range(n_rep):
+                trial_data = np.zeros((4, ))
+                trial_data[0] = i
+                trial_data[1] = policy
+                trial_data[2] = target[0]
+                trial_data[3] = target[1]
+
+                protocol.append(trial_data)
+
+    protocol = np.asarray(protocol)
+    np.random.shuffle(protocol)
+
+    np.savetxt(file_name, protocol, fmt="%.2f", delimiter=", ")
+
+
 if __name__ == "__main__":
     # generate_naive_random_policy("random_protocol.txt", 5, 8, 3)
     # generate_naive_continuous_random_protocol("random_continuous_protocol_10rep2.txt", 24, 10, 2)
     # generate_free_space_protocol("free_space_exp_protocol_2targets.txt", 5, 2)
-    generate_free_space_protocol2("free_space_exp_protocol_7targets_mixed_train.txt", n_policies=3)
-
+    # generate_free_space_protocol2("free_space_exp_protocol_7targets_mixed_train.txt", n_policies=3)
+    # generate_obs_protocol("obs_exp_protocol_3targets_mixed.txt")
+    generate_obs_protocol("obs_exp_protocol_3targets_mixed_train.txt", n_rep=1)
