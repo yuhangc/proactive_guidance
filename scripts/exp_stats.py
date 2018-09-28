@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pickle
 
 from model_plan.plotting_utils import *
+from model_plan.gp_model_approx import GPModelApproxBase
 
 
 def mixed_exp_stats(root_path, protocol_file, user):
@@ -37,7 +38,7 @@ def mixed_exp_stats(root_path, protocol_file, user):
 
             for traj_data in traj_all[i][target]:
                 traj_data = np.asarray(traj_data)
-                tf[i, target] += traj_data[-1, 0]
+                tf[i, target] += traj_data[-1, 0] - traj_data[0, 0]
 
                 for t in range(len(traj_data)-1):
                     path_len[i, target] += np.linalg.norm(traj_data[t, 1:3] - traj_data[t+1, 1:3])
@@ -89,7 +90,113 @@ def mixed_exp_stats(root_path, protocol_file, user):
     plt.show()
 
 
+def compute_model_stats(root_path, users, flag_with_box=True):
+    # load all models
+    modalities = ["haptic", "audio"]
+
+    n_user = len(users)
+    n_mod = len(modalities)
+
+    linearity = np.zeros((n_mod, n_user))
+    symmetry = np.zeros((n_mod, n_user))
+    mi = np.zeros((n_mod, n_user))
+
+    for iu, user in enumerate(users):
+        for im, modality in enumerate(modalities):
+            with open(root_path + "/user" + str(user) + "/gp_model_" + modality + ".pkl") as f:
+                model = pickle.load(f)
+
+            # compute linearity
+            linearity[im, iu] = compute_linearity(model)
+            symmetry[im, iu] = compute_symmetry(model)
+            mi[im, iu] = compute_mutual_info(model)
+
+    # visualize the results
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+    for im in range(n_mod):
+        x = np.ones_like(linearity[im]) * (im+1)
+        axes[0].scatter(x, linearity[im], alpha=0.5, lw=0)
+        axes[1].scatter(x, symmetry[im], alpha=0.5, lw=0)
+        axes[2].scatter(x, mi[im], alpha=0.5, lw=0)
+
+    if flag_with_box:
+        axes[0].boxplot(linearity.transpose(), notch=False, vert=True)
+        axes[1].boxplot(symmetry.transpose(), notch=False, vert=True)
+        axes[2].boxplot(mi.transpose(), notch=False, vert=True)
+
+    plt.show()
+
+
+def compute_linearity(model):
+    x = np.linspace(-np.pi, np.pi, 100)
+
+    linearity = 0.0
+
+    for i in range(len(x)-1):
+        xi = 0.5 * (x[i] + x[i+1])
+        y, y_std = model.predict_fast(xi)[0]
+        y -= xi
+
+        linearity += y**2 * (x[i+1] - x[i])
+
+    return linearity
+
+
+def compute_symmetry(model):
+    x = np.linspace(0, np.pi, 100)
+
+    symmetry = 0.0
+
+    for i in range(len(x) - 1):
+        xi = 0.5 * (x[i] + x[i+1])
+        y, y_std = model.predict_fast(xi)[0]
+        y_n, y_n_std = model.predict_fast(-xi)[0]
+
+        symmetry += (y + y_n)**2 * (x[i+1] - x[i])
+
+    return symmetry
+
+
+def compute_mutual_info(model):
+    x = np.linspace(-np.pi, np.pi, 200)
+    px = 0.5 / np.pi
+
+    # first compute the entropy of y
+    y = np.linspace(-np.pi, np.pi, 200)
+    ent_y = 0.0
+
+    for i in range(len(y) - 1):
+        py = 0.0
+        yi = 0.5 * (y[i] + y[i+1])
+        for j in range(len(x) - 1):
+            xi = 0.5 * (x[j] + x[j+1])
+            y_mean, y_std = model.predict_fast(xi)[0]
+
+            pyx = np.exp(-(yi - y_mean)**2 / 2.0 / y_std**2) / np.sqrt(2.0 * np.pi) / y_std
+            py += pyx * px * (x[j+1] - x[j])
+
+        ent_y += -py * np.log2(py) * (y[i+1] - y[i])
+
+    # compute entropy of y|x
+    ent_yx = 0.0
+    for i in range(len(x) - 1):
+        xi = 0.5 * (x[i] + x[i+1])
+        y_mean, y_std = model.predict_fast(xi)[0]
+
+        if y_std > 0.1:
+            y_std -= 0.05
+
+        hyx = 0.5 * np.log2(2.0 * np.pi * np.exp(1) * y_std**2)
+        ent_yx += hyx * px * (x[i+1] - x[i])
+
+    return ent_y - ent_yx
+
+
 if __name__ == "__main__":
-    mixed_exp_stats("/home/yuhang/Documents/proactive_guidance/planner_exp",
-                    "../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-                    7)
+    # mixed_exp_stats("/home/yuhang/Documents/proactive_guidance/planner_exp",
+    #                 "../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+    #                 7)
+
+    users = range(11)
+    compute_model_stats("/home/yuhang/Documents/proactive_guidance/training_data",
+                        users, flag_with_box=True)

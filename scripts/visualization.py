@@ -139,15 +139,26 @@ def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30,
                       color=cm(1. * target / len(targets)),
                       lw=2)
 
+        else:
+            axes.plot(traj_avg[:, 0], traj_avg[:, 1],
+                      color=cm(1. * target / len(targets)),
+                      lw=2)
+
+            # plot all simulated trajectories
+            for t, traj in traj_list:
+                axes.plot(traj[:, 0], traj[:, 1],
+                          color=cm(1. * target / len(targets)),
+                          lw=0.5, alpha=0.3)
+
         axes.axis("equal")
 
     if flag_save:
         save_path = "/home/yuhang/Documents/proactive_guidance/figures/modeling/user" + str(usr)
         mkdir_p(save_path)
         if flag_unified_policy:
-            fig.savefig(save_path + "/unified_policy.jpg")
+            fig.savefig(save_path + "/unified_policy_" + style + ".jpg")
         else:
-            fig.savefig(save_path + "/" + policy + "_policy.jpg")
+            fig.savefig(save_path + "/" + policy + "_policy_" + style + ".jpg")
     else:
         plt.show()
 
@@ -237,7 +248,7 @@ def visualize_naive_mdp_policy_diff(root_path, user, target):
 if __name__ == "__main__":
     s_init = np.array([-1.0, 2.0, 0.0])
     visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-                          10, "naive", s_init, flag_save=True)
+                          1, "naive", s_init, flag_save=True, style="sample")
 
     # visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
     #                       10, "mdp", s_init, flag_save=True, flag_unified_policy=True)

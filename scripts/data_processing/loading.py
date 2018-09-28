@@ -401,11 +401,11 @@ if __name__ == "__main__":
 
     # load_random_guidance_exp("/home/yuhang/Documents/proactive_guidance/training_data/user0/random_guidance", 30)
 
-    # visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
-    #                     "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+    # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user4",
+    #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
-    load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user4",
-                               "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+    visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user4",
+                        "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
     # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
     #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed2.txt",
