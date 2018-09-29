@@ -118,9 +118,12 @@ class MDPFixedTimePolicy(object):
         xf = (x - self.x_offset) / self.dx
         yf = (y - self.y_offset) / self.dy
         af = (alp - self.alp_offset) / self.dalp
+        if af >= self.nA:
+            af -= self.nA
+
         xg = int(xf)
         yg = int(yf)
-        ag = int(af) % self.nAlp
+        ag = int(af)
         ag1 = (ag + 1) % self.nAlp
 
         xf -= xg
@@ -494,8 +497,8 @@ class NaivePolicyObs(MDPFixedTimePolicy):
             else:
                 counter_policy_not_updated = 0
 
-            self.visualize_policy()
-            plt.show()
+            # self.visualize_policy()
+            # plt.show()
 
         self.flag_policy_computed = True
 
