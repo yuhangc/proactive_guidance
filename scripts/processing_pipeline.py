@@ -15,7 +15,7 @@ from model_plan.gp_model_approx import model_approx_continuous_example, model_ap
 from model_plan.gp_model_approx import GPModelApproxBase
 from model_plan.movement_model import save_default_model, MovementModel
 from model_plan.policies import generate_mdp_policies, generate_naive_policies_from_mdp
-from model_plan.policies import generate_mdp_policies_with_obs
+from model_plan.policies import generate_policies_with_obs
 from model_plan.simulation import Simulator
 
 
@@ -75,7 +75,7 @@ def train_unified_model(root_path, users):
         pickle.dump(mmodel, f)
 
 
-def gen_obs_policies(user, modality, flag_visulize_env=True):
+def gen_obs_policies(user, modality, flag_visulize_env=True, policy="mdp"):
     # 3 targets and 3 env settings
     n_targets = 3
     target_all = [[1.5, 4.5], [2.5, 3.5], [3.5, 2]]
@@ -105,9 +105,9 @@ def gen_obs_policies(user, modality, flag_visulize_env=True):
 
         plt.show()
 
-    generate_mdp_policies_with_obs(zip(target_all, obs_all),
-                                   "/home/yuhang/Documents/proactive_guidance/training_data",
-                                   modality, user)
+    generate_policies_with_obs(zip(target_all, obs_all),
+                               "/home/yuhang/Documents/proactive_guidance/training_data",
+                               modality, user, policy)
 
 
 if __name__ == "__main__":
@@ -134,4 +134,5 @@ if __name__ == "__main__":
     # users = range(10
     # train_unified_model(data_path, users)
 
-    gen_obs_policies(user, "haptic")
+    # gen_obs_policies(user, "haptic")
+    gen_obs_policies(user, "haptic", policy="naive")

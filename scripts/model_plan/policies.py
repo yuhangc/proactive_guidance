@@ -120,7 +120,7 @@ class MDPFixedTimePolicy(object):
         af = (alp - self.alp_offset) / self.dalp
         xg = int(xf)
         yg = int(yf)
-        ag = int(af)
+        ag = int(af) % self.nAlp
         ag1 = (ag + 1) % self.nAlp
 
         xf -= xg
@@ -384,7 +384,9 @@ class MDPFixedTimePolicy(object):
         return self.get_value(self.n_comm, s[0], s[1], wrap_to_pi(s[2]))
 
     def is_obs(self, s):
-        return self.get_value_func(s) < -20.0
+        xg, yg, tmp = self.xy_to_grid(s[0], s[1], s[2])
+        return self.obs[xg, yg] > 0.0
+        # return self.get_value_func(s) < -20.0
 
     def visualize_policy(self, ax=None):
         Vplot = np.max(self.V, axis=2)
@@ -397,6 +399,105 @@ class MDPFixedTimePolicy(object):
             fig, ax = plt.subplots()
 
         ax.imshow(Vplot.transpose(), origin="lower", cmap="hot", interpolation="nearest")
+        
+        
+class NaivePolicyObs(MDPFixedTimePolicy):
+    def __init__(self, ranges):
+        super(NaivePolicyObs, self).__init__(None, ranges)
+        self.dinc = 0.25
+        self.gamma = 0.95
+
+    def compute_policy(self, s_g, modality, max_iter=50):
+        if self.flag_policy_computed and self.modality == modality:
+            goal_diff = np.linalg.norm(self.s_g[:2] - s_g[:2])
+            if goal_diff < 0.25:
+                print "No need to recompute policy"
+                return
+
+        # adjust s_g to be the center of the grid
+        xgg, ygg, tmp = self.xy_to_grid(s_g[0], s_g[1], 0.0)
+        s_g_min = self.grid_to_xy(xgg, ygg, tmp)
+        s_g_max = self.grid_to_xy(xgg+1, ygg+1, tmp)
+
+        self.s_g = 0.5 * (np.asarray(s_g_min) + np.asarray(s_g_max))
+        print self.s_g
+
+        # self.s_g = s_g
+        self.modality = modality
+
+        self.init_value_function(self.s_g)
+
+        counter_policy_not_updated = 0
+        for i in range(max_iter):
+            print "At iteration ", i, "..."
+
+            flag_policy_update = False
+
+            if i <= self.a_dec_iter:
+                a_range = self.a_range_init - (self.a_range_init - self.a_range_final) / self.a_dec_iter * i
+            else:
+                a_range = self.a_range_final
+
+            da = a_range / self.nA
+            print da
+
+            # iterate over all states
+            for xg, yg in self.update_q:
+                for alp_g in range(self.nAlp):
+                    # don't perform update on goal state
+                    if (xg == xgg or xg == xgg+1) and (yg == ygg or yg == ygg+1):
+                        continue
+
+                    x, y, alp = self.grid_to_xy(xg, yg, alp_g)
+
+                    # iterate over all actions
+                    Q_max = -1000.0
+                    a_opt = 0.0
+
+                    # only sample actions that make sense
+                    a_list = wrap_to_pi(da * np.arange(0, self.nA) - a_range / 2.0 + self.policy[xg, yg, alp_g])
+
+                    for ai, a in enumerate(a_list):
+                        s_next = np.zeros((3, ))
+                        s_next[0] = x + self.dinc * np.cos(a+alp)
+                        s_next[1] = y + self.dinc * np.sin(a+alp)
+                        s_next[2] = a+alp
+
+                        if s_next[0] < self.x_range[0] or s_next[0] >= self.x_range[1] or \
+                                        s_next[1] < self.y_range[0] or s_next[1] >= self.y_range[1]:
+                            self.Q[xg, yg, alp_g, ai] = self.r_obs
+                        else:
+                            self.Q[xg, yg, alp_g, ai] = self.gamma * \
+                                                        self.get_value(self.V, s_next[0], s_next[1], s_next[2])
+
+                            if self.is_obs(s_next):
+                                # punish if end up in an obstacle state
+                                self.Q[xg, yg, alp_g, ai] += self.r_obs
+
+                        if self.Q[xg, yg, alp_g, ai] > Q_max:
+                            Q_max = self.Q[xg, yg, alp_g, ai]
+                            a_opt = a
+
+                    # update value function and policy
+                    self.V[xg, yg, alp_g] = Q_max
+
+                    if self.policy[xg, yg, alp_g] != a_opt:
+                        self.policy[xg, yg, alp_g] = a_opt
+                        flag_policy_update = True
+
+            if not flag_policy_update:
+                counter_policy_not_updated += 1
+                print "Policy not updated in ", counter_policy_not_updated, "iterations"
+                if counter_policy_not_updated >= self.n_update_th:
+                    print "Policy converged!"
+                    break
+            else:
+                counter_policy_not_updated = 0
+
+            self.visualize_policy()
+            plt.show()
+
+        self.flag_policy_computed = True
 
 
 def simulate_naive_policy(n_trials, s_g, modality, usr):
@@ -503,7 +604,7 @@ def validate_free_space_policy(planner, s_g, modality, path, model_path):
     fig.savefig(path + "/simulation.png")
 
 
-def validate_obs_policy(planner, s_g, modality, path, model_path):
+def validate_obs_policy(planner, s_g, env_list, modality, path, model_path):
     fig, axes = plt.subplots()
     planner.visualize_policy(axes)
     fig.savefig(path + "/value_func.png")
@@ -519,6 +620,13 @@ def validate_obs_policy(planner, s_g, modality, path, model_path):
     for i in range(n_trials):
         t, traj = traj_list[i]
         axes.plot(traj[:, 0], traj[:, 1])
+
+    target, obs_list = env_list
+
+    for x, y, w, h in obs_list:
+        rect = Rectangle((x, y), w, h)
+        axes.add_patch(rect)
+
     axes.axis("equal")
 
     axes.scatter(s_g[0], s_g[1], facecolor='r')
@@ -592,10 +700,10 @@ def generate_mdp_policies(protocol_file, model_path, modality, usr):
             generated[target_id] = 1.0
 
 
-def generate_mdp_policies_with_obs(env_list, model_path, modality, usr):
+def generate_policies_with_obs(env_list, model_path, modality, usr, policy="mdp"):
     n_targets = len(env_list)
 
-    save_path = model_path + "/user" + str(usr) + "/pretrained_model/mdp_" + modality + "/obstacle"
+    save_path = model_path + "/user" + str(usr) + "/pretrained_model/" + policy + "_" + modality + "/obstacle"
 
     ranges = [[-3.0, 4.5], [-1.0, 6.0]]
 
@@ -607,21 +715,25 @@ def generate_mdp_policies_with_obs(env_list, model_path, modality, usr):
             human_model = pickle.load(f)
 
         # create the planner
-        mdp_policy = MDPFixedTimePolicy(human_model, ranges)
-        mdp_policy.gen_env(obs_list)
+        if policy == "mdp":
+            policy = MDPFixedTimePolicy(human_model, ranges)
+        else:
+            policy = NaivePolicyObs(ranges)
+
+        policy.gen_env(obs_list)
 
         # compute policy
         s_g = np.array([target_pos[0], target_pos[1], 0.0])
-        mdp_policy.compute_policy(s_g, modality, max_iter=20)
+        policy.compute_policy(s_g, modality, max_iter=20)
 
         mkdir_p(save_path)
         with open(save_path + "/target" + str(i) + ".pkl", "w") as f:
-            pickle.dump(mdp_policy, f)
+            pickle.dump(policy, f)
 
         # save some figures for debug
         fig_path = save_path + "/target" + str(i) + "_figs"
         mkdir_p(fig_path)
-        validate_obs_policy(mdp_policy, s_g, modality, fig_path,
+        validate_obs_policy(policy, s_g, env_list[i], modality, fig_path,
                             model_path + "/user" + str(usr))
 
 
