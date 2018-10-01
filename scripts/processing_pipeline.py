@@ -82,9 +82,9 @@ def gen_obs_policies(user, modality, flag_visulize_env=True, policy="mdp"):
     s_init = [-2.0, 0.5, 0.25 * np.pi]
 
     obs_all = []
-    obs_all.append([[0.5, 3.25, 0.5, 2.25], [2.0, 3.25, 0.5, 2.25], [1.0, 5.0, 1.0, 0.5]])
+    obs_all.append([[0.0, 3.25, 1.0, 2.75], [2.25, 3.25, 1.0, 2.75], [1.0, 5.25, 1.25, 0.75]])
     obs_all.append([[-1.0, 2.5, 2.0, 1.0], [0.0, 1.25, 1.5, 0.5]])
-    obs_all.append([[0.0, 0.0, 0.75, 2.25], [0.75, 3.0, 2.5, 0.5], [2.0, 0.0, 1.0, 1.0]])
+    obs_all.append([[0.0, 0.0, 0.75, 2.25], [1.0, 3.0, 2.5, 0.5], [2.0, 0.0, 1.0, 1.0]])
 
     # visualize the environment
     if flag_visulize_env:
@@ -96,7 +96,9 @@ def gen_obs_policies(user, modality, flag_visulize_env=True, policy="mdp"):
                 rect = Rectangle((x, y), w, h)
                 axes[i].add_patch(rect)
 
-            axes[i].scatter(target_all[i][0], target_all[i][1], facecolor='r')
+            # axes[i].scatter(target_all[i][0], target_all[i][1], facecolor='r')
+            rect = Rectangle((target_all[i][0], target_all[i][1]), 0.25, 0.25, facecolor='r', lw=0)
+            axes[i].add_patch(rect)
             axes[i].scatter(s_init[0], s_init[1])
 
             axes[i].axis("equal")
@@ -135,4 +137,4 @@ if __name__ == "__main__":
     # train_unified_model(data_path, users)
 
     # gen_obs_policies(user, "haptic")
-    gen_obs_policies(user, "haptic", policy="naive")
+    gen_obs_policies(user, "haptic", policy="mdp")

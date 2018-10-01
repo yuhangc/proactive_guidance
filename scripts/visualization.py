@@ -204,7 +204,9 @@ def visualize_obs_policy_traj(usr, policy, n_rep=30, modality="haptic",
             rect = Rectangle((x, y), w, h)
             axes[i].add_patch(rect)
 
-        axes[i].scatter(target_all[i][0], target_all[i][1], facecolor='r')
+        # axes[i].scatter(target_all[i][0], target_all[i][1], facecolor='r')
+        rect = Rectangle((target_all[i][0], target_all[i][1]), 0.25, 0.25, facecolor='r', lw=0)
+        axes[i].add_patch(rect)
         axes[i].scatter(s_init[0], s_init[1])
 
         axes[i].axis("equal")

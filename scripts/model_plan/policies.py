@@ -179,8 +179,8 @@ class MDPFixedTimePolicy(object):
     def gen_env(self, obs_list, file_path=None):
         # obs_list is a list of rectangular obstacles in the form (x, y, w, h)
         for x, y, w, h in obs_list:
-            for i in range(int(w / self.dx)):
-                for j in range(int(h / self.dy)):
+            for i in range(int(w / self.dx) + 1):
+                for j in range(int(h / self.dy) + 1):
                     xi = x + i * self.dx
                     yj = y + j * self.dy
 
@@ -334,13 +334,14 @@ class MDPFixedTimePolicy(object):
 
                             if s_next[0] < self.x_range[0] or s_next[0] >= self.x_range[1] or \
                                             s_next[1] < self.y_range[0] or s_next[1] >= self.y_range[1]:
-                                # if d < 0.5:
-                                #     print "wrong!"
                                 Vnext += self.r_obs
                                 n_comm_next += 20
                             else:
                                 Vnext += self.get_value(self.V, s_next[0], s_next[1], s_next[2])
                                 n_comm_next += self.get_value(self.n_comm, s_next[0], s_next[1], s_next[2])
+
+                                if self.is_obs(s_next):
+                                    Vnext += self.r_obs
 
                         # if Vnext != 0:
                         #     print "here"
@@ -355,8 +356,7 @@ class MDPFixedTimePolicy(object):
 
                     # update value function and policy
                     # only update value for non-obstacle states
-                    if not self.obs[xg, yg]:
-                        self.V[xg, yg, alp_g] = Q_max
+                    self.V[xg, yg, alp_g] = Q_max
                     self.n_comm[xg, yg, alp_g] = n_comm_opt + 1
 
                     if self.policy[xg, yg, alp_g] != a_opt:
@@ -632,7 +632,9 @@ def validate_obs_policy(planner, s_g, env_list, modality, path, model_path):
 
     axes.axis("equal")
 
-    axes.scatter(s_g[0], s_g[1], facecolor='r')
+    # axes.scatter(s_g[0], s_g[1], facecolor='r')
+    rect = Rectangle((s_g[0], s_g[1]), 0.25, 0.25, facecolor='r', lw=0)
+    axes.add_patch(rect)
     fig.savefig(path + "/simulation.png")
 
 
@@ -710,7 +712,7 @@ def generate_policies_with_obs(env_list, model_path, modality, usr, policy="mdp"
 
     ranges = [[-3.0, 4.5], [-1.0, 6.0]]
 
-    for i in range(n_targets):
+    for i in range(2, n_targets):
         target_pos, obs_list = env_list[i]
 
         # load human model first
@@ -719,15 +721,15 @@ def generate_policies_with_obs(env_list, model_path, modality, usr, policy="mdp"
 
         # create the planner
         if policy == "mdp":
-            policy = MDPFixedTimePolicy(human_model, ranges)
+            policy_planner = MDPFixedTimePolicy(human_model, ranges)
         else:
-            policy = NaivePolicyObs(ranges)
+            policy_planner = NaivePolicyObs(ranges)
 
-        policy.gen_env(obs_list)
+        policy_planner.gen_env(obs_list)
 
         # compute policy
         s_g = np.array([target_pos[0], target_pos[1], 0.0])
-        policy.compute_policy(s_g, modality, max_iter=20)
+        policy_planner.compute_policy(s_g, modality, max_iter=20)
 
         mkdir_p(save_path)
         with open(save_path + "/target" + str(i) + ".pkl", "w") as f:
@@ -736,7 +738,7 @@ def generate_policies_with_obs(env_list, model_path, modality, usr, policy="mdp"
         # save some figures for debug
         fig_path = save_path + "/target" + str(i) + "_figs"
         mkdir_p(fig_path)
-        validate_obs_policy(policy, s_g, env_list[i], modality, fig_path,
+        validate_obs_policy(policy_planner, s_g, env_list[i], modality, fig_path,
                             model_path + "/user" + str(usr))
 
 
