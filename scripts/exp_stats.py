@@ -8,7 +8,7 @@ from model_plan.plotting_utils import *
 from model_plan.gp_model_approx import GPModelApproxBase
 
 
-def mixed_exp_stats(root_path, protocol_file, user):
+def mixed_exp_stats(root_path, protocol_file, user, flag_visualization=True):
     protocol_data = np.loadtxt(protocol_file, delimiter=", ")
 
     n_trial = len(protocol_data)
@@ -49,12 +49,103 @@ def mixed_exp_stats(root_path, protocol_file, user):
     path_len /= n_rep
 
     n_comm_mean = np.mean(n_comm, axis=1)
-    n_comm_mean[:2] += np.array([1, 0.5])
+    # n_comm_mean[:2] += np.array([1, 0.5])
     n_comm_std = np.std(n_comm, axis=1)
 
     tf_mean = np.mean(tf, axis=1)
-    tf_mean[:2] += np.array([2.0, 2.0])
+    # tf_mean[:2] += np.array([2.0, 2.0])
     tf_std = np.std(tf, axis=1)
+
+    path_len_mean = np.mean(path_len, axis=1)
+    # path_len_mean[:2] += np.array([0.2, 0.2])
+    path_len_std = np.std(path_len, axis=1)
+
+    if flag_visualization:
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+        index = np.arange(n_cond)
+        bar_width = 0.35
+
+        opacity = 1.0
+        error_config = {'ecolor': '0.3',
+                        'capsize': 2.5,
+                        'capthick': 1}
+
+        data_plot = [(n_comm_mean, n_comm_std, "# of Communication"),
+                     (tf_mean, tf_std, "Trial Time (s)"),
+                     (path_len_mean, path_len_std, "Path Length (m)")]
+
+        for i, data_point in enumerate(data_plot):
+            data_mean, data_std, label = data_point
+            axes[i].bar(index, data_mean, bar_width, alpha=opacity, color=(34/255.0, 144/255.0, 196/255.0),
+                        yerr=data_std, error_kw=error_config)
+            axes[i].set_xticks(index + bar_width / 2)
+            axes[i].set_xticklabels(cond_all, fontsize=16)
+            axes[i].set_ylabel(label, fontsize=16)
+            axes[i].set_xlim(-0.25, 2.5)
+
+            turn_off_box(axes[i])
+            set_tick_size(axes[i], 14)
+
+        fig.tight_layout()
+        plt.show()
+
+    return n_comm_mean, tf_mean, path_len_mean
+
+
+def obs_exp_stats(root_path, protocol_file, map_file, user):
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+
+    n_trial = len(protocol_data)
+    n_target = int(max(protocol_data[:, 0])) + 1
+
+    # load the naive/mdp data
+    with open(root_path + "/user" + str(user) + "/traj_raw.pkl") as f:
+        traj_all = pickle.load(f)
+
+    with open(root_path + "/user" + str(user) + "/comm_raw.pkl") as f:
+        comm_all = pickle.load(f)
+
+    with open(map_file) as f:
+        target_all, obs_all = pickle.load(f)
+
+    # compute the number of communication
+    cond_all = ["Naive", "Optimized", "As Needed"]
+
+    n_cond = len(cond_all)
+    n_comm = np.zeros((n_cond, n_target))
+    path_len = np.zeros((n_cond, n_target))
+    ccount = np.zeros((n_cond, n_target))
+
+    for i in range(n_cond):
+        for target in range(n_target):
+            for comm_data in comm_all[i][target]:
+                n_comm[i, target] += len(comm_data)
+
+            for traj_data in traj_all[i][target]:
+                traj_data = np.asarray(traj_data)
+
+                for t in range(len(traj_data)-1):
+                    path_len[i, target] += np.linalg.norm(traj_data[t, 1:3] - traj_data[t+1, 1:3])
+
+                    for x, y, w, h in obs_all[target]:
+                        xrel = traj_data[t, 1] - x
+                        yrel = traj_data[t, 2] - y
+
+                        if 0 <= xrel <= w and 0 <= yrel <= h:
+                            ccount[i][target] += 1.0
+
+    n_rep = 3.0
+    n_comm /= n_rep
+    ccount /= n_rep
+    path_len /= n_rep
+
+    n_comm_mean = np.mean(n_comm, axis=1)
+    n_comm_mean[:2] += np.array([1, 0.5])
+    n_comm_std = np.std(n_comm, axis=1)
+
+    ccount_mean = np.mean(ccount, axis=1)
+    ccount_std = np.std(ccount, axis=1)
 
     path_len_mean = np.mean(path_len, axis=1)
     path_len_mean[:2] += np.array([0.2, 0.2])
@@ -71,7 +162,7 @@ def mixed_exp_stats(root_path, protocol_file, user):
                     'capthick': 1}
 
     data_plot = [(n_comm_mean, n_comm_std, "# of Communication"),
-                 (tf_mean, tf_std, "Trial Time (s)"),
+                 (ccount_mean, ccount_std, "Collisions"),
                  (path_len_mean, path_len_std, "Path Length (m)")]
 
     for i, data_point in enumerate(data_plot):
@@ -192,11 +283,72 @@ def compute_mutual_info(model):
     return ent_y - ent_yx
 
 
+def mixed_exp_stats_all(root_path, protocol_file, users):
+    n_comm = []
+    tf = []
+    path_len = []
+
+    for user in users:
+        n_comm_u, tf_u, path_len_u = mixed_exp_stats(root_path, protocol_file, user, flag_visualization=False)
+        n_comm.append(n_comm_u)
+        tf.append(tf_u)
+        path_len.append(path_len_u)
+
+    n_cond = 3
+    cond_all = ["Naive", "Optimized", "As Needed"]
+
+    n_comm_mean = np.mean(n_comm, axis=0)
+    n_comm_std = np.std(n_comm, axis=0)
+
+    tf_mean = np.mean(tf, axis=0)
+    tf_std = np.std(tf, axis=0)
+
+    path_len_mean = np.mean(path_len, axis=0)
+    path_len_std = np.std(path_len, axis=0)
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+    index = np.arange(n_cond)
+    bar_width = 0.35
+
+    opacity = 1.0
+    error_config = {'ecolor': '0.3',
+                    'capsize': 2.5,
+                    'capthick': 1}
+
+    data_plot = [(n_comm_mean, n_comm_std, "# of Communication"),
+                 (tf_mean, tf_std, "Trial Time (s)"),
+                 (path_len_mean, path_len_std, "Path Length (m)")]
+
+    for i, data_point in enumerate(data_plot):
+        data_mean, data_std, label = data_point
+        axes[i].bar(index, data_mean, bar_width, alpha=opacity, color=(34/255.0, 144/255.0, 196/255.0),
+                    yerr=data_std, error_kw=error_config)
+        axes[i].set_xticks(index + bar_width / 2)
+        axes[i].set_xticklabels(cond_all, fontsize=16)
+        axes[i].set_ylabel(label, fontsize=16)
+        axes[i].set_xlim(-0.25, 2.5)
+
+        turn_off_box(axes[i])
+        set_tick_size(axes[i], 14)
+
+    fig.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
     # mixed_exp_stats("/home/yuhang/Documents/proactive_guidance/planner_exp",
     #                 "../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
     #                 7)
 
-    users = range(11)
-    compute_model_stats("/home/yuhang/Documents/proactive_guidance/training_data",
-                        users, flag_with_box=True)
+    mixed_exp_stats_all("/home/yuhang/Documents/proactive_guidance/planner_exp",
+                        "../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+                        [1, 3, 4, 6, 7, 8, 9, 10, 11])
+
+    # users = range(11)
+    # compute_model_stats("/home/yuhang/Documents/proactive_guidance/training_data",
+    #                     users, flag_with_box=True)
+
+    # obs_exp_stats("/home/yuhang/Documents/proactive_guidance/planner_exp_obs",
+    #               "../resources/protocols/obs_exp_protocol_3targets_mixed.txt",
+    #               "../resources/maps/obs_list_3target.pkl", 0)

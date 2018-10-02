@@ -12,6 +12,7 @@ from model_plan.policies import validate_free_space_policy, mkdir_p
 from model_plan.simulation import Simulator
 from model_plan.policies import NaivePolicy, MDPFixedTimePolicy
 from model_plan.policies import simulate_naive_policy
+from model_plan.gp_model_approx import GPModelApproxBase
 from data_processing.loading import wrap_to_pi
 
 
@@ -171,9 +172,9 @@ def visualize_obs_policy_traj(usr, policy, n_rep=30, modality="haptic",
     s_init = [-2.0, 0.5, 0.25 * np.pi]
 
     obs_all = []
-    obs_all.append([[0.5, 3.25, 0.5, 2.25], [2.0, 3.25, 0.5, 2.25], [1.0, 5.0, 1.0, 0.5]])
+    obs_all.append([[0.0, 3.25, 1.0, 2.75], [2.25, 3.25, 1.0, 2.75], [1.0, 5.25, 1.25, 0.75]])
     obs_all.append([[-1.0, 2.5, 2.0, 1.0], [0.0, 1.25, 1.5, 0.5]])
-    obs_all.append([[0.0, 0.0, 0.75, 2.25], [0.75, 3.0, 2.5, 0.5], [2.0, 0.0, 1.0, 1.0]])
+    obs_all.append([[0.0, 0.0, 0.75, 2.25], [1.0, 3.0, 2.5, 0.5], [2.0, 0.0, 1.0, 1.0]])
 
     # for each target
     fig, axes = plt.subplots(1, n_targets, figsize=(5 * n_targets, 5))
@@ -351,4 +352,4 @@ if __name__ == "__main__":
 
     # visualize_naive_mdp_policy_diff("/home/yuhang/Documents/proactive_guidance/training_data", 4, 0)
 
-    visualize_obs_policy_traj(3, "naive", flag_save=True, style="sample")
+    visualize_obs_policy_traj(0, "naive", flag_save=True, style="sample")
