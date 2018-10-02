@@ -84,7 +84,7 @@ def gen_obs_policies(user, modality, flag_visulize_env=True, policy="mdp"):
     obs_all = []
     obs_all.append([[0.0, 3.25, 1.0, 2.75], [2.25, 3.25, 1.0, 2.75], [1.0, 5.25, 1.25, 0.75]])
     obs_all.append([[-1.0, 2.5, 2.0, 1.0], [0.0, 1.25, 1.5, 0.5]])
-    obs_all.append([[0.0, 0.0, 0.75, 2.25], [1.0, 3.0, 2.5, 0.5], [2.0, 0.0, 1.0, 1.0]])
+    obs_all.append([[0.0, 0.0, 0.75, 2.25], [1.5, 3.0, 2.0, 0.5], [2.0, 0.0, 1.0, 1.0]])
 
     # visualize the environment
     if flag_visulize_env:
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     modalities = ["haptic", "audio"]
     # modalities = ["audio"]
 
-    user = 3
+    user = 0
 
     save_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(user)
 

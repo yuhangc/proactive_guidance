@@ -733,7 +733,7 @@ def generate_policies_with_obs(env_list, model_path, modality, usr, policy="mdp"
 
         mkdir_p(save_path)
         with open(save_path + "/target" + str(i) + ".pkl", "w") as f:
-            pickle.dump(policy, f)
+            pickle.dump(policy_planner, f)
 
         # save some figures for debug
         fig_path = save_path + "/target" + str(i) + "_figs"
