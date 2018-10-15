@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
+from scipy.signal import savgol_filter
+
 from model_plan.plotting_utils import *
 from model_plan.gp_model_approx import GPModelApproxBase
 
@@ -100,6 +102,7 @@ def compute_model_stats(root_path, users, flag_with_box=True):
     linearity = np.zeros((n_mod, n_user))
     symmetry = np.zeros((n_mod, n_user))
     mi = np.zeros((n_mod, n_user))
+    delay = np.zeros((n_mod, n_user))
 
     for iu, user in enumerate(users):
         for im, modality in enumerate(modalities):
@@ -110,21 +113,92 @@ def compute_model_stats(root_path, users, flag_with_box=True):
             linearity[im, iu] = compute_linearity(model)
             symmetry[im, iu] = compute_symmetry(model)
             mi[im, iu] = compute_mutual_info(model)
+            delay[im, iu] = compute_delay(root_path, user, modality)
 
     # visualize the results
     fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-    for im in range(n_mod):
-        x = np.ones_like(linearity[im]) * (im+1)
-        axes[0].scatter(x, linearity[im], alpha=0.5, lw=0)
-        axes[1].scatter(x, symmetry[im], alpha=0.5, lw=0)
-        axes[2].scatter(x, mi[im], alpha=0.5, lw=0)
+    # for im in range(n_mod):
+    #     x = np.ones_like(linearity[im]) * (im+1)
+    #     axes[0].scatter(x, delay[im], alpha=0.5, lw=0)
+    #     axes[1].scatter(x, linearity[im], alpha=0.5, lw=0)
+    #     axes[2].scatter(x, mi[im], alpha=0.5, lw=0)
+
+    h = []
+    medianprops = dict(linestyle='-', linewidth=2.0, color='k', alpha=0.5)
+    whisprops = dict(linestyle='-', linewidth=1.5, color=(0.5, 0.5, 0.5))
+    capprops = whisprops
+    flierprops = dict(marker='o', markerfacecolor='k', markersize=5,
+                      linestyle='none', alpha=0.5)
+    widths = [0.5, 0.5]
 
     if flag_with_box:
-        axes[0].boxplot(linearity.transpose(), notch=False, vert=True)
-        axes[1].boxplot(symmetry.transpose(), notch=False, vert=True)
-        axes[2].boxplot(mi.transpose(), notch=False, vert=True)
+        h.append(axes[0].boxplot(delay.transpose(), notch=False, vert=True, patch_artist=True, showfliers=True,
+                                 widths=widths, medianprops=medianprops, whiskerprops=whisprops,
+                                 capprops=capprops, flierprops=flierprops))
+        h.append(axes[1].boxplot(linearity.transpose(), notch=False, vert=True, patch_artist=True, showfliers=True,
+                                 widths=widths, medianprops=medianprops, whiskerprops=whisprops,
+                                 capprops=capprops, flierprops=flierprops))
+        h.append(axes[2].boxplot(mi.transpose(), notch=False, vert=True, patch_artist=True, showfliers=True,
+                                 widths=widths, medianprops=medianprops, whiskerprops=whisprops,
+                                 capprops=capprops, flierprops=flierprops))
+
+    colors = [(.278, .635, .847), (1, .706, .29)]
+    for hi in h:
+        for i, patch in enumerate(hi["boxes"]):
+            patch.set_linewidth(2.0)
+            patch.set_edgecolor((0.4, 0.4, 0.4))
+            patch.set_facecolor(colors[i])
+
+    ylabels = ["Delay (s)", "Nonlinearity", "Mutual Information (bits)"]
+    for i, ax in enumerate(axes):
+        ax.set_ylabel(ylabels[i], fontsize=16)
+        ax.set_xticklabels(["Haptic", "Verbal"], fontsize=16)
+
+        set_tick_size(ax, 14)
+        turn_off_box(ax)
+
+    axes[1].set_yticks([0.0, 0.4, 0.8, 1.2])
+    axes[2].set_yticks([2.6, 3.0, 3.4, 3.8, 4.2])
+
+    fig.tight_layout()
 
     plt.show()
+
+
+def compute_delay(root_path, user, modality):
+    # load the preprocessed data
+    path = root_path + "/user" + str(user) + "/" + modality
+    data_file = path + "/raw_transformed.pkl"
+
+    with open(data_file) as f:
+        t_all, pose_all, protocol_data = pickle.load(f)
+
+    t_delay_all = []
+    for i in range(len(protocol_data)):
+        alpha_d = protocol_data[i, 0] - 90.0
+        if alpha_d > 180:
+            alpha_d -= 360
+
+        if np.abs(alpha_d) > 45:
+            # compute angular velocity?
+            om = np.diff(pose_all[i][:, 2]) / np.diff(t_all[i])
+            om_smooth = savgol_filter(om, 41, 3)
+
+            # plt.plot(om_smooth)
+            # plt.plot(om)
+            # plt.show()
+
+            idx = np.where(np.abs(om_smooth) > 0.5)[0]
+
+            if modality == "haptic":
+                t_th = 0.6
+            else:
+                t_th = 1.0
+
+            if len(idx) > 0 and t_all[i][idx[0]] - t_all[i][0] > t_th:
+                t_delay_all.append(t_all[i][idx[0]] - t_all[i][0] - 0.1)
+
+    return np.mean(np.asarray(t_delay_all))
 
 
 def compute_linearity(model):
@@ -184,7 +258,7 @@ def compute_mutual_info(model):
         y_mean, y_std = model.predict_fast(xi)[0]
 
         if y_std > 0.1:
-            y_std -= 0.05
+            y_std -= 0.04
 
         hyx = 0.5 * np.log2(2.0 * np.pi * np.exp(1) * y_std**2)
         ent_yx += hyx * px * (x[i+1] - x[i])
@@ -197,6 +271,6 @@ if __name__ == "__main__":
     #                 "../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
     #                 7)
 
-    users = range(11)
+    users = [0, 2, 3, 4, 6, 7, 8, 9, 10, 11]
     compute_model_stats("/home/yuhang/Documents/proactive_guidance/training_data",
                         users, flag_with_box=True)

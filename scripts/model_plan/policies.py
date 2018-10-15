@@ -240,6 +240,34 @@ class MDPFixedTimePolicy(object):
                         x, y, alp = self.grid_to_xy(xg_next, yg_next, alp_g)
                         self.policy[xg_next, yg_next, alp_g] = wrap_to_pi(np.arctan2(-dy[i], -dx[i]) - alp)
 
+        # do a second pass through to handle obstacles
+        nodes = deque()
+        for xg in range(self.nX):
+            for yg in range(self.nY):
+                if visited[xg, yg]:
+                    nodes.append((xg, yg))
+
+        while nodes:
+            xg, yg = nodes.popleft()
+
+            for i in range(8):
+                xg_next = xg + dx[i]
+                yg_next = yg + dy[i]
+
+                if xg_next < 0 or yg_next < 0 or xg_next >= self.nX or yg_next >= self.nY:
+                    continue
+
+                if not visited[xg_next, yg_next]:
+                    visited[xg_next, yg_next] = True
+                    nodes.append((xg_next, yg_next))
+                    self.update_q.append((xg_next, yg_next))
+
+                    # update value and initial policy
+                    for alp_g in range(self.nAlp):
+                        # apply naive policy
+                        x, y, alp = self.grid_to_xy(xg_next, yg_next, alp_g)
+                        self.policy[xg_next, yg_next, alp_g] = wrap_to_pi(np.arctan2(-dy[i], -dx[i]) - alp)
+
         # self.visualize_policy()
         # plt.show()
 
@@ -358,6 +386,9 @@ class MDPFixedTimePolicy(object):
                     # only update value for non-obstacle states
                     self.V[xg, yg, alp_g] = Q_max
                     self.n_comm[xg, yg, alp_g] = n_comm_opt + 1
+
+                    if self.obs[xg, yg] > 0:
+                        self.V[xg, yg, alp_g] += self.r_obs
 
                     if self.policy[xg, yg, alp_g] != a_opt:
                         self.policy[xg, yg, alp_g] = a_opt
@@ -712,7 +743,7 @@ def generate_policies_with_obs(env_list, model_path, modality, usr, policy="mdp"
 
     ranges = [[-3.0, 4.5], [-1.0, 6.0]]
 
-    for i in range(2, n_targets):
+    for i in range(0, n_targets):
         target_pos, obs_list = env_list[i]
 
         # load human model first

@@ -159,6 +159,7 @@ def visualize_processes(root_path, usr, cond):
 
             pose[:, 2] = wrap_to_pi(pose[:, 2])
             axes1[i][j].plot(t, pose[:, 2])
+            axes1[i][j].set_title(str(key))
 
             d = np.linalg.norm(pose[:, :2], axis=1)
             axes2[i][j].plot(t, d)
@@ -199,7 +200,6 @@ def pre_processing_random_guidance(root_path, usr, flag_visualize=True):
 if __name__ == "__main__":
     # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "one_step")
     # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", "user1", "audio")
-    pre_processing_no_orientation("/home/yuhang/Documents/proactive_guidance/training_data", "user1", "haptic")
+    # pre_processing_no_orientation("/home/yuhang/Documents/proactive_guidance/training_data", "user1", "haptic")
     # pre_processing("/home/yuhang/Documents/proactive_guidance/training_data", 0, "audio")
-    # visualize_processes("/home/yuhang/Documents/proactive_guidance/training_data", 0, "continuous")
-
+    visualize_processes("/home/yuhang/Documents/proactive_guidance/training_data", 0, "audio")

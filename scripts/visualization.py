@@ -10,9 +10,11 @@ import pickle
 
 from model_plan.policies import validate_free_space_policy, mkdir_p
 from model_plan.simulation import Simulator
+from model_plan.movement_model import MovementModel
 from model_plan.policies import NaivePolicy, MDPFixedTimePolicy
 from model_plan.policies import simulate_naive_policy
 from data_processing.loading import wrap_to_pi
+from model_plan.plotting_utils import *
 
 
 def compute_traj_stats(traj_list, s_init, s_goal):
@@ -339,6 +341,212 @@ def visualize_naive_mdp_policy_diff(root_path, user, target):
     visualize_policy_diff(p1_file, p2_file)
 
 
+def align_trial(t, th, dist, t_shift):
+    t = np.hstack((np.array([0]), t + t_shift))
+    th = np.hstack((np.array([0]), th))
+    dist = np.hstack((np.array([0]), dist))
+
+    return t, th, dist
+
+
+def compute_avg(t_list, x_list, Tmax):
+    x_avg = np.zeros((100, ))
+
+    for ti, xi in zip(t_list, x_list):
+        t = np.linspace(0, Tmax, 100)
+        x = np.interp(t, ti, xi)
+        x_avg += x
+
+    t = np.linspace(0, Tmax, 100)
+
+    return t, x_avg / len(t_list)
+
+
+def compute_std(t_list, x_list, Tmax):
+    x_avg = np.zeros((100, ))
+
+    for ti, xi in zip(t_list, x_list):
+        t = np.linspace(0, Tmax, 100)
+        x = np.interp(t, ti, xi)
+        x_avg += x
+
+    t = np.linspace(0, Tmax, 100)
+    x_avg = x_avg / len(t_list)
+
+    x_std = np.zeros((100, ))
+    for ti, xi in zip(t_list, x_list):
+        t = np.linspace(0, Tmax, 100)
+        x = np.interp(t, ti, xi)
+        x_std += (x - x_avg)**2
+
+    x_std = np.sqrt(x_std / (len(t_list) - 1))
+
+    return t, x_avg, x_std
+
+
+def visualize_movement_model(root_path, usr, ang):
+    modalities = ["haptic", "audio"]
+
+    t_raw = []
+    th_raw = []
+    dist_raw = []
+
+    for modality in modalities:
+        # load the preprocessed data
+        path = root_path + "/user" + str(usr) + "/" + modality
+        data_file = path + "/raw_transformed.pkl"
+
+        with open(data_file) as f:
+            t_all, pose_all, protocol_data = pickle.load(f)
+
+        t_ang = []
+        th_ang = []
+        dist_ang = []
+
+        for i in range(len(protocol_data)):
+            alpha_d = protocol_data[i, 0] - 90.0
+            if alpha_d > 180:
+                alpha_d -= 360
+
+            if np.abs(alpha_d - ang) < 1e-3:
+                t_ang.append(t_all[i] - t_all[i][0])
+                th_ang.append(pose_all[i][:, 2])
+                dist_ang.append(np.linalg.norm(pose_all[i][:, :2], axis=1))
+
+        t_raw.append(t_ang)
+        th_raw.append(th_ang)
+        dist_raw.append(dist_ang)
+
+    fig, axes = plt.subplots(2, 1, figsize=(4.5, 4.5))
+
+    # fix some of the alignment issue
+    t_raw[0][1], th_raw[0][1], dist_raw[0][1] = align_trial(t_raw[0][1], th_raw[0][1], dist_raw[0][1], 0.9)
+    t_raw[0][3], th_raw[0][3], dist_raw[0][3] = align_trial(t_raw[0][3], th_raw[0][3], dist_raw[0][3], 0.9)
+
+    colors = [(0, .298, .569), (.875, .169, 0)]
+    T = 5.2
+    for i in range(len(modalities)):
+        # plot angle changes
+        for t, th in zip(t_raw[i], th_raw[i]):
+            idx = np.where(t <= T)
+            axes[0].plot(t[idx], th[idx], color=colors[i], lw=1.5, alpha=0.3)
+
+        # plot distance changes
+        for t, dist in zip(t_raw[i], dist_raw[i]):
+            idx = np.where(t <= T)
+            axes[1].plot(t[idx], dist[idx], color=colors[i], lw=1.5, alpha=0.3)
+
+    # compute the average
+    t, th_avg = compute_avg(t_raw[0], th_raw[0], T)
+    p00 = axes[0].plot(t, th_avg, color=colors[0], lw=2.0)
+    t, th_avg = compute_avg(t_raw[1], th_raw[1], T)
+    p01 = axes[0].plot(t, th_avg, color=colors[1], lw=2.0)
+
+    axes[0].set_xlim(0, 5.2)
+    axes[0].set_yticks([0.0, 1.5, 3.0])
+
+    t, th_avg = compute_avg(t_raw[0], dist_raw[0], T)
+    p10 = axes[1].plot(t, th_avg, color=colors[0], lw=2.0)
+    t, th_avg = compute_avg(t_raw[1], dist_raw[1], T)
+    p11 = axes[1].plot(t, th_avg, color=colors[1], lw=2.0)
+
+    axes[1].set_xlim(0, 5.2)
+    axes[1].set_yticks([0.0, 0.8, 1.6])
+
+    set_tick_size(axes[0], 14)
+    turn_off_box(axes[0])
+    set_tick_size(axes[1], 14)
+    turn_off_box(axes[1])
+
+    # ax.grid(linestyle="-", color='black', alpha=0.3)
+
+    # axes[0].set_xlabel(xlabel, fontsize=16)
+    axes[0].set_ylabel("Heading (rad)", fontsize=16)
+    axes[1].set_ylabel("Distance (m)", fontsize=16)
+    axes[1].set_xlabel("Time (s)", fontsize=16)
+
+    # axes[0].legend([p00[0], p01[0]], ["Haptic", "Verbal"], loc=0, fancybox=False)
+    axes[1].legend([p10[0], p11[0]], ["Haptic", "Verbal"], loc=0, fancybox=False)
+
+    fig.tight_layout()
+
+    # simulate the process
+    model = MovementModel()
+    model.load_model(root_path + "/user" + str(usr))
+    model.set_default_param()
+
+    n_samples = 20
+    traj_sim = []
+    t_sim = []
+    th_sim = []
+    dist_sim = []
+    for i in range(n_samples):
+        traj_sim.append(model.sample_traj_single_action(("haptic", np.deg2rad(ang)), 0.5, T))
+
+    fig1, axes = plt.subplots(2, 1, figsize=(4.5, 4.5))
+    colors = [(.875, .169, 0), (0, .298, .569)]
+
+    for t, traj in traj_sim:
+        thi = traj[:, 2]
+        disti = np.linalg.norm(traj[:, :2], axis=1)
+
+        axes[0].plot(t, thi, color=colors[1], lw=0.75, alpha=0.3)
+        p100 = axes[1].plot(t, disti, color=colors[1], lw=0.75, alpha=0.3)
+
+        t_sim.append(t)
+        th_sim.append(thi)
+        dist_sim.append(disti)
+
+    t, th_avg, th_std = compute_std(t_sim, th_sim, T)
+    axes[0].plot(t, th_avg, color=colors[1], lw=2.0)
+    # axes[0].fill_between(t, th_avg - th_std, th_avg + th_std,
+    #                      alpha=0.2, color='k')
+    t, dist_avg, dist_std = compute_std(t_sim, dist_sim, T)
+    p101 = axes[1].plot(t, dist_avg, color=colors[1], lw=2.0)
+    # axes[1].fill_between(t, dist_avg - dist_std, dist_avg + dist_std,
+    #                      alpha=0.2, color='k')
+
+    # plot angle changes
+    # for t, th in zip(t_raw[0], th_raw[0]):
+    #     idx = np.where(t <= T)
+    #     axes[0].plot(t[idx], th[idx], color=colors[0], lw=1.5, alpha=0.3)
+    #
+    # # plot distance changes
+    # for t, dist in zip(t_raw[0], dist_raw[0]):
+    #     idx = np.where(t <= T)
+    #     axes[1].plot(t[idx], dist[idx], color=colors[0], lw=1.5, alpha=0.3)
+
+    t, th_avg = compute_avg(t_raw[0], th_raw[0], T)
+    axes[0].plot(t, th_avg, color=colors[0], lw=2.0)
+
+    axes[0].set_xlim(0, 5.2)
+    axes[0].set_yticks([0.0, 1.5, 3.0])
+
+    t, th_avg = compute_avg(t_raw[0], dist_raw[0], T)
+    p11 = axes[1].plot(t, th_avg, color=colors[0], lw=2.0)
+
+    axes[1].set_xlim(0, 5.2)
+    axes[1].set_yticks([0.0, 0.8, 1.6])
+
+    set_tick_size(axes[0], 14)
+    turn_off_box(axes[0])
+    set_tick_size(axes[1], 14)
+    turn_off_box(axes[1])
+
+    # ax.grid(linestyle="-", color='black', alpha=0.3)
+
+    # axes[0].set_xlabel(xlabel, fontsize=16)
+    axes[0].set_ylabel("Heading (rad)", fontsize=16)
+    axes[1].set_ylabel("Distance (m)", fontsize=16)
+    axes[1].set_xlabel("Time (s)", fontsize=16)
+
+    axes[1].legend([p101[0], p11[0]], ["Simulation", "Measurement"], loc=0, fancybox=False)
+
+    fig1.tight_layout()
+
+    plt.show()
+
+
 if __name__ == "__main__":
     # s_init = np.array([-1.0, 2.0, 0.0])
     # visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
@@ -351,4 +559,6 @@ if __name__ == "__main__":
 
     # visualize_naive_mdp_policy_diff("/home/yuhang/Documents/proactive_guidance/training_data", 4, 0)
 
-    visualize_obs_policy_traj(3, "naive", flag_save=True, style="sample")
+    # visualize_obs_policy_traj(3, "naive", flag_save=True, style="sample")
+
+    visualize_movement_model("/home/yuhang/Documents/proactive_guidance/training_data", 0, 105)

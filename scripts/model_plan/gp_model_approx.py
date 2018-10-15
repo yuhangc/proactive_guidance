@@ -11,7 +11,7 @@ from plotting_utils import *
 
 
 # utility function for outlier rejection
-def outlier_rejection(x, m=2.0):
+def outlier_rejection(x, m=1.8):
     return x[np.abs(x - np.mean(x)) < m * np.std(x)]
 
 
@@ -148,14 +148,29 @@ class GPModelApproxBase(object):
         y_mean = self.gp_mean[dim].predict(x.reshape(n_samples, -1))
         y_std = self.gp_std[dim].predict(x.reshape(n_samples, -1))
 
-        ax.plot(x, y_mean, 'k', lw=3, zorder=9, label="GP Mean")
+        p1 = ax.plot(x, y_mean, 'k', lw=3, zorder=9)
         ax.fill_between(x, y_mean - y_std, y_mean + y_std,
                         alpha=0.2, color='k')
+        p2 = ax.fill(np.NaN, np.NaN, 'k', alpha=0.2, lw=0)
 
-        ax.scatter(self.data[:, 0], self.data[:, dim+1], c='r', s=12, zorder=10, lw=0, alpha=0.5, label="Raw Data")
+        p3 = ax.scatter(self.data[:, 0], self.data[:, dim+1], c='r', s=12, zorder=10, lw=0, alpha=0.3)
+
+        # plot the "perfect" response
+        x = [-np.pi, np.pi]
+        p4 = ax.plot(x, x, '--', lw=1.5, c=(0.3, 0.3, 0.3))
+
+        ax.legend([(p1[0], p2[0]), p3, p4[0]],
+                  ["Model Prediction", "Raw Data", "Linear Response"],
+                  loc=0, fancybox=False)
+        set_tick_size(ax, 14)
+        turn_off_box(ax)
+
+        # ax.grid(linestyle="-", color='black', alpha=0.3)
 
         ax.set_xlabel(xlabel, fontsize=16)
         ax.set_ylabel(ylabel, fontsize=16)
+
+        return p1, p2, p3
 
     def visualize_model(self):
         # visualize each individual gp
@@ -174,7 +189,7 @@ class GPModelApproxBase(object):
                                "feedback(rad)", "response std(rad)")
 
         # visualize each dimension of the model
-        fig, axes = plt.subplots(self.dim, 1, figsize=(5, 5))
+        fig, axes = plt.subplots(self.dim, 1, figsize=(4.5, 4.5))
 
         if self.dim > 1:
             for i in range(self.dim):
@@ -182,13 +197,6 @@ class GPModelApproxBase(object):
         else:
             self._visualize_process(0, axes, "Feedback (rad)", "Response (rad)")
 
-        # plot the "perfect" response
-        x = [-np.pi, np.pi]
-        axes.plot(x, x, '--', lw=1.5, c=(0.3, 0.3, 0.3), label="Linear Response")
-
-        axes.legend(loc=0, fancybox=False)
-        set_tick_size(axes, 14)
-        turn_off_box(axes)
         fig.tight_layout()
 
         plt.show()

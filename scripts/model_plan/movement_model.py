@@ -54,13 +54,17 @@ class MovementModel(object):
         self.params["haptic"] = MovementModelParam()
         self.params["audio"] = MovementModelParam()
 
-        self.params["haptic"].delay = np.log(1.0)
-        self.params["haptic"].om = 2.0
+        # self.params["haptic"].delay = np.log(1.0)
+        # self.params["haptic"].om = 2.0
+        self.params["haptic"].delay = np.log(1.1)
+        self.params["haptic"].om = 1.6
         self.params["haptic"].vd = 0.5
         self.params["haptic"].std_delay = 0.1
         self.params["haptic"].std_om = 0.2
-        self.params["haptic"].std_vd = 0.05
-        self.params["haptic"].std_vd_heading = 0.05
+        # self.params["haptic"].std_vd = 0.05
+        # self.params["haptic"].std_vd_heading = 0.05
+        self.params["haptic"].std_vd = 0.1
+        self.params["haptic"].std_vd_heading = 0.06
 
         self.params["audio"].delay = np.log(2.0)
         self.params["audio"].om = 2.0
@@ -121,10 +125,10 @@ class MovementModel(object):
         # first sample the delay
         t = self.sample_delay(a)
 
-        if t < 0.6:
-            t = 0.6
-        elif t > 1.5:
-            t = 1.5
+        # if t < 0.6:
+        #     t = 0.6
+        # elif t > 1.5:
+        #     t = 1.5
         # if t >= T:
         #     # t_traj.append(T)
         #     # traj.append(self.s.copy())
@@ -132,16 +136,16 @@ class MovementModel(object):
         #     print "movement model: this should not happen...\r"
         #     t = T * 0.5
 
-        tt = 0.0
+        # tt = 0.0
         s = self.s.copy()
-        while tt + dt < t:
-            tt += dt
-            s += np.array([np.cos(self.s[2]), np.sin(self.s[2]), 0.0]) * dt * self.params["haptic"].vd * 0.25
-            t_traj.append(tt)
-            traj.append(s.copy())
-
+        # while tt + dt < t:
+        #     tt += dt
+        #     s += np.array([np.cos(self.s[2]), np.sin(self.s[2]), 0.0]) * dt * self.params["haptic"].vd * 0.25
+        #     t_traj.append(tt)
+        #     traj.append(s.copy())
+        #
         t_traj.append(t)
-        s += np.array([np.cos(self.s[2]), np.sin(self.s[2]), 0.0]) * (t-tt) * self.params["haptic"].vd * 0.25
+        # s += np.array([np.cos(self.s[2]), np.sin(self.s[2]), 0.0]) * (t-tt) * self.params["haptic"].vd * 0.25
         traj.append(s.copy())
 
         # sample the "true" direction that human follows
