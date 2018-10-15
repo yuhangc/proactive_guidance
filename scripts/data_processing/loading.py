@@ -5,6 +5,7 @@ import pickle
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
+from matplotlib.patches import Rectangle
 
 from matplotlib import rcParams
 rcParams['font.family'] = 'serif'
@@ -378,6 +379,67 @@ def visualize_mixed_exp(root_path, protocol_file):
     plt.show()
 
 
+def visualize_obs_exp(root_path, protocol_file, map_file):
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+    with open(map_file) as f:
+        target_all, obs_all = pickle.load(f)
+    with open(root_path + "/traj_raw.pkl") as f:
+        traj_data = pickle.load(f)
+
+    n_trial = len(protocol_data)
+
+    n_cond = 3
+    n_target = int(np.max(protocol_data[:, 0])+1)
+    cond_name = ["Naive", "Optimized", "As Needed"]
+
+    # generate a color map
+    cm = plt.get_cmap("gist_rainbow")
+
+    for target in range(n_target):
+        fig, axes = plt.subplots(1, n_cond, figsize=(13, 5))
+
+        for i in range(n_cond):
+            # plot the map
+            circ = Circle((target_all[target][0], target_all[target][1]),
+                          radius=0.35, facecolor=(0.8, 0.0, 0.0), alpha=0.15, lw=0)
+            axes[i].add_patch(circ)
+
+            for x, y, w, h in obs_all[target]:
+                rect = Rectangle((x, y), w, h, facecolor=(0.4, 0.4, 0.4), hatch='x', lw=2)
+                axes[i].add_patch(rect)
+
+            # plot trajectories
+            for traj in traj_data[i][target]:
+                # extend the traj a little for visual effect
+                s = traj[-1].copy()
+                s_g = np.asarray(target_all[target])
+
+                d = np.linalg.norm(s[1:3] - s_g)
+                if d >= 0.3:
+                    th = np.arctan2(s_g[1] - s[2], s_g[0] - s[1])
+                    s += np.array([1.0, np.cos(th), np.sin(th), 0.0, 0.0, 0.0]) * 0.1
+                    traj = np.vstack((traj, s.reshape(1, -1)))
+
+                axes[i].plot(traj[:, 1], traj[:, 2], color=(0.3, 0.3, 0.8), lw=1.0)
+
+            axes[i].set_title(cond_name[i], fontsize=16)
+
+        fig.tight_layout()
+
+        for i in range(n_cond):
+            axes[i].axis("equal")
+            axes[i].set_title(cond_name[i], fontsize=16)
+            axes[i].set_xlim(-3.0, 4.0)
+            axes[i].set_ylim(-1.0, 6.0)
+
+            for tick in axes[i].xaxis.get_major_ticks():
+                tick.label.set_fontsize(14)
+            for tick in axes[i].yaxis.get_major_ticks():
+                tick.label.set_fontsize(14)
+
+    plt.show()
+
+
 if __name__ == "__main__":
     # load_save_all("/home/yuhang/Documents/proactive_guidance/training_data/test1-0830",
     #               "../../resources/protocols/random_continuous_protocol_10rep2.txt",
@@ -404,10 +466,17 @@ if __name__ == "__main__":
     # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user4",
     #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
-    visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user4",
-                        "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+    # visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user4",
+    #                     "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
     # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
     #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed2.txt",
     #                            flag_all_mixed=False,
     #                            mcts_proto="../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt")
+
+    # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp_obs/user0",
+    #                            "../../resources/protocols/obs_exp_protocol_3targets_mixed.txt")
+
+    visualize_obs_exp("/home/yuhang/Documents/proactive_guidance/planner_exp_obs/user0",
+                      "../../resources/protocols/obs_exp_protocol_3targets_mixed.txt",
+                      "../../resources/maps/obs_list_3target.pkl")

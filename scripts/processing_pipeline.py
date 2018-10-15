@@ -86,6 +86,9 @@ def gen_obs_policies(user, modality, flag_visulize_env=True, policy="mdp"):
     obs_all.append([[-1.0, 2.5, 2.0, 1.0], [0.0, 1.25, 1.5, 0.5]])
     obs_all.append([[0.0, 0.0, 0.75, 2.25], [1.5, 3.0, 2.0, 0.5], [2.0, 0.0, 1.0, 1.0]])
 
+    with open("../resources/maps/obs_list_3target.pkl", "w") as f:
+        pickle.dump((target_all, obs_all), f)
+
     # visualize the environment
     if flag_visulize_env:
         fig, axes = plt.subplots(1, n_targets, figsize=(4 * n_targets, 4))
