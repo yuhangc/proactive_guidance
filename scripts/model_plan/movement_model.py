@@ -105,7 +105,7 @@ class MovementModel(object):
             traj[-1, 2] = wrap_to_pi(traj[-1, 2])
             return traj[-1]
 
-    def sample_traj_single_action(self, a, dt, T, flag_return_alp=False):
+    def sample_traj_single_action(self, a, dt, T, flag_return_alp=False, flag_delay_move=True):
         """
         Simulate the trajectory given a single communication action
         :param a: action in the form of (modality, alpha_d)
@@ -125,10 +125,10 @@ class MovementModel(object):
         # first sample the delay
         t = self.sample_delay(a)
 
-        # if t < 0.6:
-        #     t = 0.6
-        # elif t > 1.5:
-        #     t = 1.5
+        if t < 0.6:
+            t = 0.6
+        elif t > 1.5:
+            t = 1.5
         # if t >= T:
         #     # t_traj.append(T)
         #     # traj.append(self.s.copy())
@@ -136,17 +136,21 @@ class MovementModel(object):
         #     print "movement model: this should not happen...\r"
         #     t = T * 0.5
 
-        # tt = 0.0
-        s = self.s.copy()
-        # while tt + dt < t:
-        #     tt += dt
-        #     s += np.array([np.cos(self.s[2]), np.sin(self.s[2]), 0.0]) * dt * self.params["haptic"].vd * 0.25
-        #     t_traj.append(tt)
-        #     traj.append(s.copy())
-        #
-        t_traj.append(t)
-        # s += np.array([np.cos(self.s[2]), np.sin(self.s[2]), 0.0]) * (t-tt) * self.params["haptic"].vd * 0.25
-        traj.append(s.copy())
+        if flag_delay_move:
+            tt = 0.0
+            s = self.s.copy()
+            while tt + dt < t:
+                tt += dt
+                s += np.array([np.cos(self.s[2]), np.sin(self.s[2]), 0.0]) * dt * self.params["haptic"].vd * 0.4
+                t_traj.append(tt)
+                traj.append(s.copy())
+
+            t_traj.append(t)
+            s += np.array([np.cos(self.s[2]), np.sin(self.s[2]), 0.0]) * (t-tt) * self.params["haptic"].vd * 0.4
+        else:
+            s = self.s.copy()
+            t_traj.append(t)
+            traj.append(s.copy())
 
         # sample the "true" direction that human follows
         # ad_mean, ad_std = self.gp_model[a[0]].predict(a[1])[0]

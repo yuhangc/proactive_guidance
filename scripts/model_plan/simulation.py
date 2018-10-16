@@ -52,7 +52,11 @@ class Simulator(object):
             alpha_d = self.planner.sample_policy(self.human_model.s)
 
             # sample human response giving feedback
-            t_traj, traj = self.human_model.sample_traj_single_action((modality, alpha_d), self.dt, self.dt_comm)
+            if t == 0.0:
+                t_traj, traj = self.human_model.sample_traj_single_action((modality, alpha_d), self.dt, self.dt_comm,
+                                                                          flag_delay_move=False)
+            else:
+                t_traj, traj = self.human_model.sample_traj_single_action((modality, alpha_d), self.dt, self.dt_comm)
             t_traj += t
 
             t = t_traj[-1]

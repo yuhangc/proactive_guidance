@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.path as mpath
 import matplotlib.patches as mpatches
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle, Circle
 
 import pickle
 
@@ -175,10 +175,12 @@ def visualize_policies_free_space(usr, s_init):
 
     model_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(usr)
 
-    fig, axes = plt.subplots(figsize=(4, 4))
+    fig, axes = plt.subplots(1, 2, figsize=(8, 4.5))
 
-    colors = [[(.157, .486, .31), (.133, .412, .412)], [(.686, .431, .224), (.686, .329, .224)]]
+    colors = [[(.161, .267, .49), (.133, .412, .412)], [(.729, .18, .196), (.733, .431, .18)]]
     color_id = [0, 1, 1, 0, 0, 1, 1]
+
+    titles = ["Optimized Policy", "Naive Policy"]
 
     for ip, policy in enumerate(policies):
         policy_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(usr) + \
@@ -199,17 +201,34 @@ def visualize_policies_free_space(usr, s_init):
             # compute the average (and covariance?)
             traj_avg, traj_ub, traj_lb = compute_traj_stats(traj_list, s_init, planner.s_g)
 
-            axes.plot(traj_avg[:, 0], traj_avg[:, 1],
-                      color=colors[ip][color_id[target]],
-                      lw=2)
+            axes[ip].plot(traj_avg[:, 0], traj_avg[:, 1],
+                          color=colors[ip][color_id[target]],
+                          lw=2)
 
             # plot all simulated trajectories
             for t, traj in traj_list:
-                axes.plot(traj[:, 0], traj[:, 1],
-                          color=colors[ip][color_id[target]],
-                          lw=0.5, alpha=0.3)
+                axes[ip].plot(traj[:, 0], traj[:, 1],
+                              color=colors[ip][color_id[target]],
+                              lw=0.75, alpha=0.2)
 
-    axes.axis("equal")
+            # plot the target?
+            circ = Circle((planner.s_g[0], planner.s_g[1]),
+                          radius=0.35, fill=False, alpha=0.5, lw=1, linestyle='--')
+            axes[ip].add_patch(circ)
+
+        axes[ip].axis("equal")
+        axes[ip].set_title(titles[ip])
+        axes[ip].set_ylim(-1, 5)
+        set_tick_size(axes[ip], 14)
+
+    fig.tight_layout()
+    axes[0].set_ylim(-1, 5)
+    axes[0].set_xlim(-1.25, 4.3)
+    # axes[0].grid()
+    axes[1].set_ylim(-1, 5)
+    axes[1].set_xlim(-1.25, 4.3)
+    # axes[1].grid()
+
     plt.show()
 
 
