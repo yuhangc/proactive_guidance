@@ -167,6 +167,52 @@ def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30,
         plt.show()
 
 
+def visualize_policies_free_space(usr, s_init):
+    policies = ["mdp", "naive"]
+    ntargets = 7
+    T = 30.0
+    n_rep = 30
+
+    model_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(usr)
+
+    fig, axes = plt.subplots(figsize=(4, 4))
+
+    colors = [[(.157, .486, .31), (.133, .412, .412)], [(.686, .431, .224), (.686, .329, .224)]]
+    color_id = [0, 1, 1, 0, 0, 1, 1]
+
+    for ip, policy in enumerate(policies):
+        policy_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(usr) + \
+                      "/pretrained_model/" + policy + "_haptic/free_space"
+
+        for target in range(ntargets):
+            with open(policy_path + "/target" + str(target) + ".pkl") as f:
+                planner = pickle.load(f)
+
+            # create simulator and simulate
+            sim = Simulator(planner, model_path)
+
+            traj_list = []
+
+            for i in range(n_rep):
+                traj_list.append(sim.run_trial(s_init, planner.s_g, "haptic", T, tol=0.3))
+
+            # compute the average (and covariance?)
+            traj_avg, traj_ub, traj_lb = compute_traj_stats(traj_list, s_init, planner.s_g)
+
+            axes.plot(traj_avg[:, 0], traj_avg[:, 1],
+                      color=colors[ip][color_id[target]],
+                      lw=2)
+
+            # plot all simulated trajectories
+            for t, traj in traj_list:
+                axes.plot(traj[:, 0], traj[:, 1],
+                          color=colors[ip][color_id[target]],
+                          lw=0.5, alpha=0.3)
+
+    axes.axis("equal")
+    plt.show()
+
+
 def visualize_obs_policy_traj(usr, policy, n_rep=30, modality="haptic",
                               style="cov", flag_save=False):
     n_targets = 3
@@ -549,9 +595,10 @@ def visualize_movement_model(root_path, usr, ang):
 
 
 if __name__ == "__main__":
-    # s_init = np.array([-1.0, 2.0, 0.0])
+    s_init = np.array([-1.0, 2.0, 0.0])
     # visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-    #                       1, "naive", s_init, flag_save=True, style="sample")
+    #                       3, "naive", s_init, flag_save=True, style="sample")
+    visualize_policies_free_space(3, s_init)
 
     # visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
     #                       10, "mdp", s_init, flag_save=True, flag_unified_policy=True)
@@ -562,4 +609,4 @@ if __name__ == "__main__":
 
     # visualize_obs_policy_traj(3, "naive", flag_save=True, style="sample")
 
-    visualize_movement_model("/home/yuhang/Documents/proactive_guidance/training_data", 0, 105)
+    # visualize_movement_model("/home/yuhang/Documents/proactive_guidance/training_data", 0, 105)
