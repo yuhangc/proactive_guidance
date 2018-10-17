@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import pickle
 
 from scipy.signal import savgol_filter
+import scipy.stats as stats
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+from statsmodels.stats.libqsturng import psturng
 
 from model_plan.plotting_utils import *
 from model_plan.gp_model_approx import GPModelApproxBase
@@ -369,7 +372,9 @@ def mixed_exp_stats_all(root_path, protocol_file, users):
         path_len.append(path_len_u)
 
     n_cond = 3
-    cond_all = ["Naive", "Optimized", "As Needed"]
+    cond_all = ["Naive\nPolicy", "Optimized\nPolicy", "Communicate\nAs Needed"]
+    # colors = [(.3, .3, .3), (.306, .404, .631), (.941, .40, .40)]
+    colors = [(.8, .8, .8), (.278, .635, .847), (1, .706, .29)]
 
     n_comm_mean = np.mean(n_comm, axis=0)
     n_comm_std = np.std(n_comm, axis=0)
@@ -380,15 +385,16 @@ def mixed_exp_stats_all(root_path, protocol_file, users):
     path_len_mean = np.mean(path_len, axis=0)
     path_len_std = np.std(path_len, axis=0)
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
 
     index = np.arange(n_cond)
-    bar_width = 0.35
+    bar_width = 0.6
 
     opacity = 1.0
     error_config = {'ecolor': '0.3',
+                    'linewidth': 1.5,
                     'capsize': 2.5,
-                    'capthick': 1}
+                    'capthick': 1.5}
 
     data_plot = [(n_comm_mean, n_comm_std, "# of Communication"),
                  (tf_mean, tf_std, "Trial Time (s)"),
@@ -396,12 +402,15 @@ def mixed_exp_stats_all(root_path, protocol_file, users):
 
     for i, data_point in enumerate(data_plot):
         data_mean, data_std, label = data_point
-        axes[i].bar(index, data_mean, bar_width, alpha=opacity, color=(34/255.0, 144/255.0, 196/255.0),
-                    yerr=data_std, error_kw=error_config)
+        # axes[i].bar(index, data_mean, bar_width, alpha=opacity, color=(34/255.0, 144/255.0, 196/255.0),
+        #             yerr=data_std, error_kw=error_config)
+        for j in range(n_cond):
+            axes[i].bar(index[j], data_mean[j], bar_width, alpha=opacity, color=colors[j], lw=2,
+                        edgecolor=(0.4, 0.4, 0.4), yerr=data_std[j], error_kw=error_config)
         axes[i].set_xticks(index + bar_width / 2)
         axes[i].set_xticklabels(cond_all, fontsize=16)
         axes[i].set_ylabel(label, fontsize=16)
-        axes[i].set_xlim(-0.25, 2.5)
+        axes[i].set_xlim(-0.25, 2.8)
 
         turn_off_box(axes[i])
         set_tick_size(axes[i], 14)
@@ -409,19 +418,42 @@ def mixed_exp_stats_all(root_path, protocol_file, users):
     fig.tight_layout()
     plt.show()
 
+    # ANOVA for human priority trials
+    n_comm = np.asarray(n_comm)
+    tf = np.asarray(tf)
+    path_len = np.asarray(path_len)
+
+    metrics = [n_comm, tf, path_len]
+    metric_names = ["ncomm", "tf", "path_len"]
+
+    for i in range(len(metrics)):
+        st, pval = stats.f_oneway(metrics[i][:, 0], metrics[i][:, 1], metrics[i][:, 2])
+        print "Statistics for ", metric_names[i], ": (F=", st, ", p=", pval, ")"
+
+        # post-hoc test to find pairwise differences
+        groups = np.tile(np.array([1, 2, 3]), (len(metrics[i]), 1))
+        tukey = pairwise_tukeyhsd(endog=metrics[i].flatten(), groups=groups.flatten(), alpha=0.05)
+        # tukey.plot_simultaneous()
+        print tukey.summary()
+
+        # compute p-values
+        st_range = np.abs(tukey.meandiffs) / tukey.std_pairs
+        print "pvalues are: ", psturng(st_range, len(tukey.groupsunique), tukey.df_total)
+        print ">>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+
 
 if __name__ == "__main__":
     # mixed_exp_stats("/home/yuhang/Documents/proactive_guidance/planner_exp",
     #                 "../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-    #                 7)
+    #                 0)
 
-    # mixed_exp_stats_all("/home/yuhang/Documents/proactive_guidance/planner_exp",
-    #                     "../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-    #                     [1, 3, 4, 6, 7, 8, 9, 10, 11])
+    mixed_exp_stats_all("/home/yuhang/Documents/proactive_guidance/planner_exp",
+                        "../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
+                        [1, 3, 3, 4, 6, 7, 8, 9, 10, 11])
 
-    users = [0, 2, 3, 4, 6, 7, 8, 9, 10, 11]
-    compute_model_stats("/home/yuhang/Documents/proactive_guidance/training_data",
-                        users, flag_with_box=True)
+    # users = [0, 2, 3, 4, 6, 7, 8, 9, 10, 11]
+    # compute_model_stats("/home/yuhang/Documents/proactive_guidance/training_data",
+    #                     users, flag_with_box=True)
 
     # users = range(11)
     # compute_model_stats("/home/yuhang/Documents/proactive_guidance/training_data",

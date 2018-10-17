@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.patches import Rectangle
 
+from scipy.signal import savgol_filter
+
 from matplotlib import rcParams
 rcParams['font.family'] = 'serif'
 rcParams['font.serif'] = ['Times New Roman']
@@ -301,15 +303,16 @@ def visualize_mixed_exp(root_path, protocol_file):
     n_trial = len(protocol_data)
 
     # generate a color map
-    n_colors = int(np.max(protocol_data[:, 0]))
-    cm = plt.get_cmap("gist_rainbow")
+    n_colors = int(np.max(protocol_data[:, 0])) + 1
+    # cm = plt.get_cmap("gist_rainbow")
+    cm = plt.get_cmap("viridis")
 
     n_cond = 3
     n_target = 7
-    cond_name = ["Naive", "Optimized", "As Needed"]
+    cond_name = ["Naive Policy", "Optimized Policy", "Communicate As Needed"]
     # pose_all = [[] for i in range(n_cond)]
 
-    fig, axes = plt.subplots(1, n_cond, figsize=(13, 5))
+    fig, axes = plt.subplots(1, n_cond, figsize=(12, 4.5))
 
     # plot the goals
     target_pos = np.zeros((n_target, 2))
@@ -321,8 +324,11 @@ def visualize_mixed_exp(root_path, protocol_file):
             visited[trial_id] = 1.0
             target_pos[trial_id] = protocol_data[trial, 2:4]
             for i in range(n_cond):
+                # circ = Circle((protocol_data[trial, 2], protocol_data[trial, 3]),
+                #               radius=0.35, fill=False, alpha=0.5, lw=1, linestyle='--')
                 circ = Circle((protocol_data[trial, 2], protocol_data[trial, 3]),
-                              radius=0.35, facecolor='k', alpha=0.15, lw=0)
+                              radius=0.35, facecolor=cm(1. * trial_id / n_colors), fill=True,
+                              alpha=0.5, lw=1, linestyle='--', edgecolor='k')
                 axes[i].add_patch(circ)
 
     with open(root_path + "/traj_raw.pkl") as f:
@@ -341,7 +347,11 @@ def visualize_mixed_exp(root_path, protocol_file):
                     s += np.array([1.0, np.cos(th), np.sin(th), 0.0, 0.0, 0.0]) * 0.1
                     traj = np.vstack((traj, s.reshape(1, -1)))
 
-                axes[cond].plot(traj[:, 1], traj[:, 2], color=cm(1. * target / n_colors))
+                # smooth the trajectory
+                traj_smooth = savgol_filter(traj, 41, 3, axis=0)
+
+                axes[cond].plot(traj_smooth[:, 1], traj_smooth[:, 2],
+                                color=cm(1. * target / n_colors), lw=1.0, alpha=0.6)
 
     # for trial in range(n_trial):
     #     data = np.loadtxt(root_path + "/trials/trial" + str(trial) + ".txt", delimiter=", ")
@@ -463,13 +473,13 @@ if __name__ == "__main__":
 
     # load_random_guidance_exp("/home/yuhang/Documents/proactive_guidance/training_data/user0/random_guidance", 30)
 
-    # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user4",
-    #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+    load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user0",
+                               "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
-    # visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user4",
-    #                     "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+    visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user0",
+                        "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
-    # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
+    # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user0",
     #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed2.txt",
     #                            flag_all_mixed=False,
     #                            mcts_proto="../../resources/protocols/free_space_exp_protocol_7targets_mdp.txt")
@@ -477,6 +487,6 @@ if __name__ == "__main__":
     # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp_obs/user0",
     #                            "../../resources/protocols/obs_exp_protocol_3targets_mixed.txt")
 
-    visualize_obs_exp("/home/yuhang/Documents/proactive_guidance/planner_exp_obs/user0",
-                      "../../resources/protocols/obs_exp_protocol_3targets_mixed.txt",
-                      "../../resources/maps/obs_list_3target.pkl")
+    # visualize_obs_exp("/home/yuhang/Documents/proactive_guidance/planner_exp_obs/user0",
+    #                   "../../resources/protocols/obs_exp_protocol_3targets_mixed.txt",
+    #                   "../../resources/maps/obs_list_3target.pkl")
