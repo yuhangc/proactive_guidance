@@ -232,27 +232,28 @@ def visualize_policies_free_space(usr, s_init):
     plt.show()
 
 
-def visualize_obs_policy_traj(usr, policy, n_rep=30, modality="haptic",
+def visualize_obs_policy_traj(usr, target, n_rep=30, modality="haptic",
                               style="cov", flag_save=False):
-    n_targets = 3
-    target_all = [[1.5, 4.5], [2.5, 3.5], [3.5, 2]]
+    map_file = "../resources/maps/obs_list_3target.pkl"
+    with open(map_file) as f:
+        target_all, obs_all = pickle.load(f)
+
     s_init = [-2.0, 0.5, 0.25 * np.pi]
 
-    obs_all = []
-    obs_all.append([[0.0, 3.25, 1.0, 2.75], [2.25, 3.25, 1.0, 2.75], [1.0, 5.25, 1.25, 0.75]])
-    obs_all.append([[-1.0, 2.5, 2.0, 1.0], [0.0, 1.25, 1.5, 0.5]])
-    obs_all.append([[0.0, 0.0, 0.75, 2.25], [1.0, 3.0, 2.5, 0.5], [2.0, 0.0, 1.0, 1.0]])
-
     # for each target
-    fig, axes = plt.subplots(1, n_targets, figsize=(5 * n_targets, 5))
-    fig.tight_layout()
-    cm = plt.get_cmap("gist_rainbow")
+    n_policy = 2
+    policies = ["naive", "mdp"]
+    policy_names = ["Naive Policy", "Optimized Policy"]
 
-    for i in range(n_targets):
+    colors = [(0., 0., 0.), (.161, .267, .49)]
+
+    fig, axes = plt.subplots(1, n_policy, figsize=(8, 3.5))
+
+    for i in range(n_policy):
         # load policy
         policy_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(usr) + \
-                      "/pretrained_model/" + policy + "_" + modality + "/obstacle"
-        with open(policy_path + "/target" + str(i) + ".pkl") as f:
+                      "/pretrained_model/" + policies[i] + "_" + modality + "/obstacle"
+        with open(policy_path + "/target" + str(target) + ".pkl") as f:
             planner = pickle.load(f)
 
         # create simulator and simulate
@@ -268,18 +269,24 @@ def visualize_obs_policy_traj(usr, policy, n_rep=30, modality="haptic",
         traj_avg, traj_ub, traj_lb = compute_traj_stats(traj_list, s_init, planner.s_g)
 
         # plot the thing
-        for x, y, w, h in obs_all[i]:
-            rect = Rectangle((x, y), w, h)
+        for x, y, w, h in obs_all[target]:
+            rect = Rectangle((x, y), w, h, facecolor=(0.7, 0.7, 0.7), hatch='x', lw=2, edgecolor=(0.3, 0.3, 0.3))
             axes[i].add_patch(rect)
 
         # axes[i].scatter(target_all[i][0], target_all[i][1], facecolor='r')
-        rect = Rectangle((target_all[i][0], target_all[i][1]), 0.25, 0.25, facecolor='r', lw=0)
-        axes[i].add_patch(rect)
-        axes[i].scatter(s_init[0], s_init[1])
+        circ = Circle((target_all[target][0] + 0.125, target_all[target][1] + 0.125),
+                      radius=0.35, facecolor=(0.8, 0.0, 0.0), alpha=0.15, lw=1, linestyle='--', edgecolor='k')
+        axes[i].add_patch(circ)
 
         axes[i].axis("equal")
-        axes[i].set_xlim(-3, 4.5)
-        axes[i].set_ylim(-1, 6)
+        axes[i].set_xlim(-2.5, 3.5)
+        axes[i].set_ylim(-0.3, 4.5)
+        axes[i].set_title(policy_names[i], fontsize=16)
+
+        for tick in axes[i].xaxis.get_major_ticks():
+            tick.label.set_fontsize(14)
+        for tick in axes[i].yaxis.get_major_ticks():
+            tick.label.set_fontsize(14)
 
         if style == "cov":
 
@@ -308,19 +315,21 @@ def visualize_obs_policy_traj(usr, policy, n_rep=30, modality="haptic",
 
         else:
             axes[i].plot(traj_avg[:, 0], traj_avg[:, 1],
-                         color='k',
+                         color=colors[i],
                          lw=2)
 
             # plot all simulated trajectories
             for t, traj in traj_list:
                 axes[i].plot(traj[:, 0], traj[:, 1],
-                             color='k',
+                             color=colors[i],
                              lw=0.5, alpha=0.3)
+
+    fig.tight_layout()
 
     if flag_save:
         save_path = "/home/yuhang/Documents/proactive_guidance/figures/modeling/user" + str(usr)
         mkdir_p(save_path)
-        fig.savefig(save_path + "/" + policy + "_policy_obs_" + style + ".jpg")
+        fig.savefig(save_path + "/obs_target_" + str(target) + "_" + style + ".jpg")
     else:
         plt.show()
 
@@ -617,7 +626,7 @@ if __name__ == "__main__":
     s_init = np.array([-1.0, 2.0, 0.0])
     # visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
     #                       3, "naive", s_init, flag_save=True, style="sample")
-    visualize_policies_free_space(3, s_init)
+    # visualize_policies_free_space(3, s_init)
 
     # visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
     #                       10, "mdp", s_init, flag_save=True, flag_unified_policy=True)
@@ -626,6 +635,6 @@ if __name__ == "__main__":
 
     # visualize_naive_mdp_policy_diff("/home/yuhang/Documents/proactive_guidance/training_data", 4, 0)
 
-    # visualize_obs_policy_traj(3, "naive", flag_save=True, style="sample")
+    visualize_obs_policy_traj(0, 1, flag_save=False, style="sample")
 
     # visualize_movement_model("/home/yuhang/Documents/proactive_guidance/training_data", 0, 105)

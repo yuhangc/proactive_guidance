@@ -6,12 +6,15 @@ import pickle
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.patches import Rectangle
+import matplotlib as mpl
 
 from scipy.signal import savgol_filter
 
 from matplotlib import rcParams
 rcParams['font.family'] = 'serif'
 rcParams['font.serif'] = ['Times New Roman']
+
+mpl.rcParams['hatch.linewidth'] = 0.5  # previous pdf hatch linewidth
 
 
 def wrap_to_pi(ang):
@@ -399,24 +402,27 @@ def visualize_obs_exp(root_path, protocol_file, map_file):
     n_trial = len(protocol_data)
 
     n_cond = 3
+    n_env = 3
     n_target = int(np.max(protocol_data[:, 0])+1)
-    cond_name = ["Naive", "Optimized", "As Needed"]
+    cond_name = ["Naive Policy", "Optimized Policy", "Communicate As Needed"]
 
     # generate a color map
     cm = plt.get_cmap("gist_rainbow")
+    colors = [(.5, .5, .5), (.278, .635, .847), (1, .706, .29)]
+
+    fig, axes = plt.subplots(n_target, n_cond, figsize=(12, 9))
+    ylims = [(0.5, 6.0), (0.0, 4.5), (0.0, 4.0)]
 
     for target in range(n_target):
-        fig, axes = plt.subplots(1, n_cond, figsize=(13, 5))
-
         for i in range(n_cond):
             # plot the map
             circ = Circle((target_all[target][0], target_all[target][1]),
-                          radius=0.35, facecolor=(0.8, 0.0, 0.0), alpha=0.15, lw=0)
-            axes[i].add_patch(circ)
+                          radius=0.35, facecolor=(0.8, 0.0, 0.0), alpha=0.15, lw=1, linestyle='--', edgecolor='k')
+            axes[target][i].add_patch(circ)
 
             for x, y, w, h in obs_all[target]:
-                rect = Rectangle((x, y), w, h, facecolor=(0.4, 0.4, 0.4), hatch='x', lw=2)
-                axes[i].add_patch(rect)
+                rect = Rectangle((x, y), w, h, facecolor=(0.7, 0.7, 0.7), hatch='x', lw=2, edgecolor=(0.3, 0.3, 0.3))
+                axes[target][i].add_patch(rect)
 
             # plot trajectories
             for traj in traj_data[i][target]:
@@ -430,23 +436,65 @@ def visualize_obs_exp(root_path, protocol_file, map_file):
                     s += np.array([1.0, np.cos(th), np.sin(th), 0.0, 0.0, 0.0]) * 0.1
                     traj = np.vstack((traj, s.reshape(1, -1)))
 
-                axes[i].plot(traj[:, 1], traj[:, 2], color=(0.3, 0.3, 0.8), lw=1.0)
+                traj_smooth = savgol_filter(traj, 41, 3, axis=0)
 
-            axes[i].set_title(cond_name[i], fontsize=16)
+                axes[target][i].plot(traj_smooth[:, 1], traj_smooth[:, 2], color=colors[i], lw=1.0)
 
         fig.tight_layout()
 
         for i in range(n_cond):
-            axes[i].axis("equal")
-            axes[i].set_title(cond_name[i], fontsize=16)
-            axes[i].set_xlim(-3.0, 4.0)
-            axes[i].set_ylim(-1.0, 6.0)
+            axes[target][i].axis("equal")
+            if target == 0:
+                axes[target][i].set_title(cond_name[i], fontsize=16)
+            axes[target][i].set_xlim(-3.0, 4.0)
+            axes[target][i].set_ylim(ylims[target][0], ylims[target][1])
 
-            for tick in axes[i].xaxis.get_major_ticks():
+            if target == 1:
+                axes[target][i].set_yticks([0.0, 1.0, 2.0, 3.0, 4.0])
+
+            for tick in axes[target][i].xaxis.get_major_ticks():
                 tick.label.set_fontsize(14)
-            for tick in axes[i].yaxis.get_major_ticks():
+            for tick in axes[target][i].yaxis.get_major_ticks():
                 tick.label.set_fontsize(14)
 
+    plt.show()
+
+
+def visualize_obs(map_file, target):
+    with open(map_file) as f:
+        target_all, obs_all = pickle.load(f)
+
+    fig, axes = plt.subplots(figsize=(5, 4))
+
+    circ = Circle((target_all[target][0], target_all[target][1]),
+                  radius=0.35, facecolor=(0.8, 0.0, 0.0), alpha=0.15, lw=1, linestyle='--', edgecolor='k')
+    axes.add_patch(circ)
+
+    for x, y, w, h in obs_all[target]:
+        rect = Rectangle((x, y), w, h, facecolor=(0.7, 0.7, 0.7), hatch='x', lw=2, edgecolor=(0.3, 0.3, 0.3))
+        axes.add_patch(rect)
+
+    axes.plot([1], [1], lw=0)
+    axes.axis("equal")
+    axes.set_xlim(-2.5, 3.0)
+    axes.set_ylim(0.0, 5.0)
+
+    axes.tick_params(
+        axis='x',          # changes apply to the x-axis
+        which='both',      # both major and minor ticks are affected
+        top='off',         # ticks along the top edge are off
+        bottom='off'
+    )
+
+    axes.tick_params(
+        axis='y',          # changes apply to the x-axis
+        which='both',      # both major and minor ticks are affected
+        right='off',         # ticks along the top edge are off
+        left='off'
+    )
+
+    axes.set_xticklabels([])
+    axes.set_yticklabels([])
     plt.show()
 
 
@@ -473,11 +521,11 @@ if __name__ == "__main__":
 
     # load_random_guidance_exp("/home/yuhang/Documents/proactive_guidance/training_data/user0/random_guidance", 30)
 
-    load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user0",
-                               "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
-
-    visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user0",
-                        "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+    # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user0",
+    #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
+    #
+    # visualize_mixed_exp("/home/yuhang/Documents/proactive_guidance/planner_exp/user0",
+    #                     "../../resources/protocols/free_space_exp_protocol_7targets_mixed.txt")
 
     # load_free_space_test_mixed("/home/yuhang/Documents/proactive_guidance/planner_exp/user0",
     #                            "../../resources/protocols/free_space_exp_protocol_7targets_mixed2.txt",
@@ -490,3 +538,5 @@ if __name__ == "__main__":
     # visualize_obs_exp("/home/yuhang/Documents/proactive_guidance/planner_exp_obs/user0",
     #                   "../../resources/protocols/obs_exp_protocol_3targets_mixed.txt",
     #                   "../../resources/maps/obs_list_3target.pkl")
+
+    visualize_obs("../../resources/maps/obs_list_3target.pkl", 1)
