@@ -136,8 +136,9 @@ if __name__ == "__main__":
 
     # model_approx_continuous_example(save_path, "audio", False)
 
-    # users = range(10)
-    # train_unified_model(data_path, users)
+    # users = [0, 2, 3, 4, 6, 7, 8, 9, 10, 11]
+    users = range(11)
+    train_unified_model(data_path, users)
 
     # gen_obs_policies(user, "haptic")
-    gen_obs_policies(user, "haptic", policy="mdp")
+    # gen_obs_policies(user, "haptic", policy="mdp")

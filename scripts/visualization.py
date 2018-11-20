@@ -5,8 +5,11 @@ import matplotlib.pyplot as plt
 import matplotlib.path as mpath
 import matplotlib.patches as mpatches
 from matplotlib.patches import Rectangle, Circle
+import matplotlib.gridspec as gridspec
 
 import pickle
+
+from scipy.signal import savgol_filter
 
 from model_plan.policies import validate_free_space_policy, mkdir_p
 from model_plan.simulation import Simulator
@@ -90,14 +93,17 @@ def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30,
         if target not in targets:
             targets.append(target)
 
+    c = 0
+    colors = [[(.161, .267, .49), (.133, .412, .412)], [(.729, .18, .196), (.733, .431, .18)]]
+    color_id = [0, 1, 1, 0, 0, 1, 1]
+
     # for each target
-    fig, axes = plt.subplots()
-    cm = plt.get_cmap("gist_rainbow")
+    fig, axes = plt.subplots(figsize=(3.75, 4))
 
     for target in targets:
         # load policy
         if flag_unified_policy:
-            policy_path = "/home/yuhang/Documents/proactive_guidance/training_data/user_unified" + \
+            policy_path = "/home/yuhang/Documents/proactive_guidance/training_data/unified" + \
                           "/pretrained_model/" + policy + "_" + modality + "/free_space"
         else:
             policy_path = "/home/yuhang/Documents/proactive_guidance/training_data/user" + str(usr) + \
@@ -112,7 +118,7 @@ def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30,
         traj_list = []
         T = 30.0
         for i in range(n_rep):
-            traj_list.append(sim.run_trial(s_init, planner.s_g, modality, T, tol=0.3))
+            traj_list.append(sim.run_trial(s_init, planner.s_g, modality, T, tol=0.35))
 
         # compute the average (and covariance?)
         traj_avg, traj_ub, traj_lb = compute_traj_stats(traj_list, s_init, planner.s_g)
@@ -136,25 +142,36 @@ def visualize_policy_traj(protocol_file, usr, policy, s_init, n_rep=30,
             codes, verts = zip(*path_data)
             cov_path = mpath.Path(verts, codes)
             axes.add_patch(mpatches.PathPatch(cov_path,
-                                              color=cm(1. * target / len(targets)),
+                                              color=colors[c][color_id[target]],
                                               alpha=0.3))
 
             axes.plot(traj_avg[:, 0], traj_avg[:, 1],
-                      color=cm(1. * target / len(targets)),
+                      color=colors[c][color_id[target]],
                       lw=2)
 
         else:
             axes.plot(traj_avg[:, 0], traj_avg[:, 1],
-                      color=cm(1. * target / len(targets)),
+                      color=colors[c][color_id[target]],
                       lw=2)
 
             # plot all simulated trajectories
             for t, traj in traj_list:
                 axes.plot(traj[:, 0], traj[:, 1],
-                          color=cm(1. * target / len(targets)),
+                          color=colors[c][color_id[target]],
                           lw=0.5, alpha=0.3)
 
-        axes.axis("equal")
+        circ = Circle((planner.s_g[0], planner.s_g[1]),
+                      radius=0.35, fill=False, alpha=0.5, lw=1, linestyle='--')
+        axes.add_patch(circ)
+
+    axes.axis("equal")
+    axes.set_title("Personalized Model", fontsize=16)
+    axes.set_ylim(-1, 5)
+    set_tick_size(axes, 14)
+
+    fig.tight_layout()
+    axes.set_ylim(-1, 5)
+    axes.set_xlim(-1.25, 4.3)
 
     if flag_save:
         save_path = "/home/yuhang/Documents/proactive_guidance/figures/modeling/user" + str(usr)
@@ -316,13 +333,13 @@ def visualize_obs_policy_traj(usr, target, n_rep=30, modality="haptic",
         else:
             axes[i].plot(traj_avg[:, 0], traj_avg[:, 1],
                          color=colors[i],
-                         lw=2)
+                         lw=0)
 
             # plot all simulated trajectories
             for t, traj in traj_list:
                 axes[i].plot(traj[:, 0], traj[:, 1],
                              color=colors[i],
-                             lw=0.5, alpha=0.3)
+                             lw=0.0, alpha=0.3)
 
     fig.tight_layout()
 
@@ -622,6 +639,251 @@ def visualize_movement_model(root_path, usr, ang):
     plt.show()
 
 
+def visualize_all_models(root_path, modality, users):
+    # first load the unified model
+    with open(root_path + "/unified/gp_model_" + modality + ".pkl") as f:
+        model = pickle.load(f)
+
+    n_samples = 50
+    x = np.linspace(-np.pi, np.pi, n_samples)
+
+    y_mean = model.predict(x.reshape(n_samples, -1))
+    y = y_mean[0][0]
+
+    fig, axes = plt.subplots(figsize=(4, 4))
+    axes.plot(x, y, 'k', lw=2)
+
+    for user in users:
+        with open(root_path + "/user" + str(user) + "/gp_model_" + modality + ".pkl") as f:
+            model = pickle.load(f)
+
+        n_samples = 50
+        x = np.linspace(-np.pi, np.pi, n_samples)
+
+        y_mean = model.predict(x.reshape(n_samples, -1))
+        y = y_mean[0][0]
+        axes.plot(x, y, 'k', lw=1, alpha=0.3)
+
+    axes.axis("equal")
+    plt.show()
+
+
+def visualize_traj_and_feedback(root_path, protocol_file, traj_ids):
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+
+    n_trial = len(protocol_data)
+
+    # generate a color map
+    n_colors = int(np.max(protocol_data[:, 0])) + 1
+    # cm = plt.get_cmap("gist_rainbow")
+    cm = plt.get_cmap("viridis")
+
+    n_cond = 3
+    n_target = 7
+    cond_name = ["Naive Policy", "Optimized Policy", "Communicate As Needed"]
+    # pose_all = [[] for i in range(n_cond)]
+
+    fig, axes = plt.subplots(1, n_cond, figsize=(12, 4.5))
+
+    # plot the goals
+    target_pos = np.zeros((n_target, 2))
+    visited = np.zeros((100, ))
+
+    for trial in range(n_trial):
+        trial_id = int(protocol_data[trial, 0])
+        if visited[trial_id] < 1.0:
+            visited[trial_id] = 1.0
+            target_pos[trial_id] = protocol_data[trial, 2:4]
+            for i in range(n_cond):
+                # circ = Circle((protocol_data[trial, 2], protocol_data[trial, 3]),
+                #               radius=0.35, fill=False, alpha=0.5, lw=1, linestyle='--')
+                circ = Circle((protocol_data[trial, 2], protocol_data[trial, 3]),
+                              radius=0.35, facecolor=cm(1. * trial_id / n_colors), fill=True,
+                              alpha=0.5, lw=1, linestyle='--', edgecolor='k')
+                axes[i].add_patch(circ)
+
+    with open(root_path + "/traj_raw.pkl") as f:
+        traj_data = pickle.load(f)
+
+    with open(root_path + "/comm_raw.pkl") as f:
+        comm_data = pickle.load(f)
+
+    for cond in range(n_cond):
+        for target in range(n_target):
+            for i, traj in enumerate(traj_data[cond][target]):
+                if i == traj_ids[cond][target]:
+                    # extend the traj a little for visual effect
+                    s = traj[-1].copy()
+                    s_g = target_pos[target]
+
+                    d = np.linalg.norm(s[1:3] - s_g)
+                    if d >= 0.3:
+                        th = np.arctan2(s_g[1] - s[2], s_g[0] - s[1])
+                        s += np.array([1.0, np.cos(th), np.sin(th), 0.0, 0.0, 0.0]) * 0.1
+                        traj = np.vstack((traj, s.reshape(1, -1)))
+
+                    # smooth the trajectory
+                    traj_smooth = savgol_filter(traj, 41, 3, axis=0)
+
+                    # align the communication with the trajectory
+                    t_traj = traj[:, 0]
+                    comm = comm_data[cond][target][i].reshape(-1, 2)
+                    t_comm = comm[:, 0]
+
+                    t_traj -= t_traj[0]
+                    t_comm -= t_comm[0]
+
+                    for t in range(len(t_comm)):
+                        x = np.interp(t_comm[t], t_traj, traj[:, 1])
+                        y = np.interp(t_comm[t], t_traj, traj[:, 2])
+                        th = np.deg2rad(np.interp(t_comm[t], t_traj, traj[:, 3]))
+
+                        # plot the arrow
+                        dl = 0.3
+                        th += comm[t, 1]
+
+                        axes[cond].arrow(x, y, dl * np.cos(th), dl * np.sin(th), alpha=0.6,
+                                         head_width=0.05, head_length=0.1)
+
+                    axes[cond].plot(traj_smooth[:, 1], traj_smooth[:, 2],
+                                    color=cm(1. * target / n_colors), lw=1.0, alpha=0.6)
+
+    for i in range(n_cond):
+        axes[i].set_title(cond_name[i], fontsize=16)
+
+    fig.tight_layout()
+
+    for i in range(n_cond):
+        axes[i].axis("equal")
+        axes[i].set_title(cond_name[i], fontsize=16)
+        axes[i].set_xlim(-1.5, 4.5)
+        axes[i].set_ylim(-1.5, 5.5)
+
+        for tick in axes[i].xaxis.get_major_ticks():
+            tick.label.set_fontsize(14)
+        for tick in axes[i].yaxis.get_major_ticks():
+            tick.label.set_fontsize(14)
+
+    plt.show()
+
+
+def visualize_err_vs_control(root_path, protocol_file, target, trial_id):
+    protocol_data = np.loadtxt(protocol_file, delimiter=", ")
+
+    n_cond = 3
+    cond_name = ["Naive Policy", "Optimized Policy", "Communicate As Needed"]
+    # pose_all = [[] for i in range(n_cond)]
+
+    n_colors = 7
+    # cm = plt.get_cmap("gist_rainbow")
+    cm = plt.get_cmap("viridis")
+
+    axes = [[] for i in range(3)]
+    spans = [2, 1, 1]
+    ypos = [0, 2, 3]
+
+    fig = plt.figure(figsize=(8, 5.5))
+    for i in range(3):
+        for j in range(n_cond):
+            axes[i].append(plt.subplot2grid((max(ypos)+1, n_cond), (ypos[i], j), rowspan=spans[i]))
+
+    # get the goal position
+    target_pos = np.zeros((2, ))
+
+    for data in protocol_data:
+        if data[0] == target:
+            target_pos = data[2:4]
+            break
+
+    with open(root_path + "/traj_raw.pkl") as f:
+        traj_data = pickle.load(f)
+
+    with open(root_path + "/comm_raw.pkl") as f:
+        comm_data = pickle.load(f)
+
+    for cond in range(n_cond):
+        traj = traj_data[cond][target][trial_id[cond]]
+        comm = comm_data[cond][target][trial_id[cond]]
+
+        t_traj = traj[:, 0]
+        t_comm = comm[:, 0]
+
+        t_traj -= t_traj[0]
+        t_comm -= t_comm[0]
+
+        # compute heading error over time
+        x_diff = traj[:, 1] - target_pos[0]
+        y_diff = traj[:, 2] - target_pos[1]
+
+        th_desired = np.arctan2(-y_diff, -x_diff)
+        th_diff = wrap_to_pi(th_desired - np.deg2rad(traj[:, 3]))
+
+        th_diff = savgol_filter(th_diff, 41, 3, axis=0)
+
+        # plot the trajectory
+        # traj = savgol_filter(traj, 41, 3, axis=0)
+        axes[0][cond].plot(traj[:, 1], traj[:, 2], color='k', alpha=0.5)
+
+        # target
+        circ = Circle((target_pos[0], target_pos[1]),
+                      radius=0.35, facecolor=cm(5. / n_colors), fill=True,
+                      alpha=0.5, lw=1, linestyle='--', edgecolor='k')
+        axes[0][cond].add_patch(circ)
+        axes[0][cond].axis('equal')
+
+        for t in range(len(t_comm)):
+            x = np.interp(t_comm[t], t_traj, traj[:, 1])
+            y = np.interp(t_comm[t], t_traj, traj[:, 2])
+            th = np.deg2rad(np.interp(t_comm[t], t_traj, traj[:, 3]))
+
+            # plot the arrow
+            dl = 0.3
+            th += comm[t, 1]
+
+            axes[0][cond].arrow(x, y, dl * np.cos(th), dl * np.sin(th),
+                                head_width=0.08, head_length=0.1,
+                                edgecolor='k', facecolor='k')
+
+        axes[0][cond].set_title(cond_name[cond], fontsize=12)
+        axes[0][cond].set_xlim(-1.5, 2.5)
+
+        # plot
+        p0 = axes[1][cond].plot(t_traj, th_diff, '-', color=(.173, .298, .475), linewidth=2.0)
+        # axes[cond].stem(t_comm, comm[:, 1], '-.')
+
+        p10 = axes[1][cond].scatter(t_comm, comm[:, 1], facecolors='none', edgecolors=(.722, .22, .22), linewidth=2.0)
+
+        t_comm = np.hstack((t_comm, np.array([t_traj[-1]])))
+        comm_plot = np.hstack((np.array([comm[0, 1]]), comm[:, 1]))
+        p11 = axes[1][cond].step(t_comm, comm_plot, color=(.722, .22, .22), alpha=0.5)
+
+        # plot a zero line
+        axes[1][cond].plot(np.array([0, t_traj[-1]]), np.array([0, 0]), '-.k', linewidth=1.0)
+        axes[1][cond].set_xlim(0, t_traj[-1])
+
+        if cond == 0:
+            axes[1][cond].set_ylabel("    (rad)", fontsize=12)
+            axes[1][cond].legend([p0[0], (p10, p11[0])], ["Error", "Guidance"],
+                                 loc=0, fancybox=False, bbox_to_anchor=(0.04, 0.5), frameon=False)
+
+        turn_off_box(axes[1][cond])
+
+        # plot the distance over time
+        d_diff = np.sqrt(x_diff**2 + y_diff**2)
+        # d_diff = savgol_filter(d_diff, 41, 3)
+        axes[2][cond].plot(t_traj, d_diff, color=(.173, .298, .475), linewidth=2.0)
+        axes[2][cond].plot(np.array([0, t_traj[-1]]), np.array([0.35, 0.35]), '-.k', linewidth=1.0)
+        axes[2][cond].set_xlim(0, t_traj[-1])
+
+        if cond == 0:
+            axes[2][cond].set_ylabel("    (m)", fontsize=12)
+        axes[2][cond].set_xlabel("Time (s)", fontsize=12)
+        turn_off_box(axes[2][cond])
+
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
     s_init = np.array([-1.0, 2.0, 0.0])
     # visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
@@ -629,12 +891,28 @@ if __name__ == "__main__":
     # visualize_policies_free_space(3, s_init)
 
     # visualize_policy_traj("../resources/protocols/free_space_exp_protocol_7targets_mdp.txt",
-    #                       10, "mdp", s_init, flag_save=True, flag_unified_policy=True)
+    #                       4, "mdp", s_init, style="sample", flag_unified_policy=False)
 
     # simulate_naive_policy(30, np.array([2.46, 4.00, 0.0]), "haptic", 3)
 
     # visualize_naive_mdp_policy_diff("/home/yuhang/Documents/proactive_guidance/training_data", 4, 0)
 
-    visualize_obs_policy_traj(0, 1, flag_save=False, style="sample")
+    # visualize_obs_policy_traj(0, 1, flag_save=False, style="sample")
 
     # visualize_movement_model("/home/yuhang/Documents/proactive_guidance/training_data", 0, 105)
+
+    # users = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10]
+    # # users = [9]
+    # visualize_all_models("/home/yuhang/Documents/proactive_guidance/training_data", "haptic", users)
+
+    # traj_ids = [[0, 0, 0, 0, 0, 0, 0],
+    #             [0, 0, 0, 0, 0, 2, 0],
+    #             [0, 2, 2, 0, 0, 0, 1]]
+    # visualize_traj_and_feedback("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
+    #                             "../resources/protocols/free_space_exp_protocol_7targets_mixed.txt",
+    #                             traj_ids)
+
+    trial_ids = [1, 2, 0]
+    visualize_err_vs_control("/home/yuhang/Documents/proactive_guidance/planner_exp/user3",
+                             "../resources/protocols/free_space_exp_protocol_7targets_mixed.txt",
+                             5, trial_ids)

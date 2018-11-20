@@ -106,7 +106,8 @@ class GPModelApproxBase(object):
             self.gp_std[i].fit(self.X.reshape(-1, 1), self.y_std[i])
 
     def predict(self, dir_in):
-        x = np.array([dir_in]).reshape(-1, 1)
+        # x = np.array([dir_in]).reshape(-1, 1)
+        x = dir_in
         y = []
 
         for i in range(self.dim):
@@ -153,15 +154,17 @@ class GPModelApproxBase(object):
                         alpha=0.2, color='k')
         p2 = ax.fill(np.NaN, np.NaN, 'k', alpha=0.2, lw=0)
 
-        p3 = ax.scatter(self.data[:, 0], self.data[:, dim+1], c='r', s=12, zorder=10, lw=0, alpha=0.3)
+        p3 = ax.scatter(self.data[:, 0], self.data[:, dim+1], c='r', s=12, zorder=10, lw=0, alpha=0.2)
 
         # plot the "perfect" response
         x = [-np.pi, np.pi]
         p4 = ax.plot(x, x, '--', lw=1.5, c=(0.3, 0.3, 0.3))
 
-        ax.legend([(p1[0], p2[0]), p3, p4[0]],
-                  ["Model Prediction", "Raw Data", "Linear Response"],
-                  loc=0, fancybox=False)
+        props = {"alpha": 1.0, "edgecolor": 'k'}
+        leg = ax.legend([(p1[0], p2[0]), p3, p4[0]],
+                        ["Model Prediction", "Raw Data", "Linear Response"],
+                        loc=0, fancybox=False, fontsize=16)
+        leg.get_frame().set_edgecolor('k')
         set_tick_size(ax, 14)
         turn_off_box(ax)
 
