@@ -147,6 +147,7 @@ class MovementModel(object):
 
             t_traj.append(t)
             s += np.array([np.cos(self.s[2]), np.sin(self.s[2]), 0.0]) * (t-tt) * self.params["haptic"].vd * 0.4
+            traj.append(s.copy())
         else:
             s = self.s.copy()
             t_traj.append(t)

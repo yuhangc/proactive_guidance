@@ -573,28 +573,28 @@ def visualize_movement_model(root_path, usr, ang):
     th_sim = []
     dist_sim = []
     for i in range(n_samples):
-        traj_sim.append(model.sample_traj_single_action(("haptic", np.deg2rad(ang)), 0.5, T))
+        traj_sim.append(model.sample_traj_single_action(("haptic", np.deg2rad(ang)), 0.5, T, flag_delay_move=False))
 
     fig1, axes = plt.subplots(2, 1, figsize=(4.5, 4.5))
-    colors = [(.875, .169, 0), (0, .298, .569)]
+    colors = [(.875, .169, 0), (0, .298, .569), (.471, .616, .204)]
 
     for t, traj in traj_sim:
         thi = traj[:, 2]
         disti = np.linalg.norm(traj[:, :2], axis=1)
 
-        axes[0].plot(t, thi, color=colors[1], lw=0.75, alpha=0.3)
-        p100 = axes[1].plot(t, disti, color=colors[1], lw=0.75, alpha=0.3)
+        axes[0].plot(t, thi, color=colors[2], lw=0.75, alpha=0.3)
+        p100 = axes[1].plot(t, disti, color=colors[2], lw=0.75, alpha=0.3)
 
         t_sim.append(t)
         th_sim.append(thi)
         dist_sim.append(disti)
 
     t, th_avg, th_std = compute_std(t_sim, th_sim, T)
-    axes[0].plot(t, th_avg, color=colors[1], lw=2.0)
+    axes[0].plot(t, th_avg, color=colors[2], lw=2.0)
     # axes[0].fill_between(t, th_avg - th_std, th_avg + th_std,
     #                      alpha=0.2, color='k')
     t, dist_avg, dist_std = compute_std(t_sim, dist_sim, T)
-    p101 = axes[1].plot(t, dist_avg, color=colors[1], lw=2.0)
+    p101 = axes[1].plot(t, dist_avg, color=colors[2], lw=2.0)
     # axes[1].fill_between(t, dist_avg - dist_std, dist_avg + dist_std,
     #                      alpha=0.2, color='k')
 
@@ -609,13 +609,13 @@ def visualize_movement_model(root_path, usr, ang):
     #     axes[1].plot(t[idx], dist[idx], color=colors[0], lw=1.5, alpha=0.3)
 
     t, th_avg = compute_avg(t_raw[0], th_raw[0], T)
-    axes[0].plot(t, th_avg, color=colors[0], lw=2.0)
+    axes[0].plot(t, th_avg, color=colors[1], lw=2.0)
 
     axes[0].set_xlim(0, 5.2)
     axes[0].set_yticks([0.0, 1.5, 3.0])
 
     t, th_avg = compute_avg(t_raw[0], dist_raw[0], T)
-    p11 = axes[1].plot(t, th_avg, color=colors[0], lw=2.0)
+    p11 = axes[1].plot(t, th_avg, color=colors[1], lw=2.0)
 
     axes[1].set_xlim(0, 5.2)
     axes[1].set_yticks([0.0, 0.8, 1.6])
@@ -632,7 +632,10 @@ def visualize_movement_model(root_path, usr, ang):
     axes[1].set_ylabel("Distance (m)", fontsize=16)
     axes[1].set_xlabel("Time (s)", fontsize=16)
 
-    axes[1].legend([p101[0], p11[0]], ["Simulation", "Measurement"], loc=0, fancybox=False)
+    legend = axes[1].legend([p101[0], p11[0]], ["Simulation", "Measurement"],
+                            loc=0, fancybox=False, fontsize=12)
+    fm = legend.get_frame()
+    fm.set_edgecolor('k')
 
     fig1.tight_layout()
 
